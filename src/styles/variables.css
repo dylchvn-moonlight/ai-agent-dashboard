@@ -1,0 +1,57 @@
+:root {
+  /* Backgrounds */
+  --bg: #0B0F1A;
+  --sf: #111827;
+  --sf2: #1a2236;
+  --bd: #1E293B;
+
+  /* Text */
+  --tx: #E2E8F0;
+  --sb: #94A3B8;
+  --dm: #64748B;
+  --hd: #FFFFFF;
+
+  /* Glass */
+  --glass: rgba(17,24,39,0.7);
+  --glassBd: rgba(255,255,255,0.06);
+
+  /* Accents */
+  --blue: #3B82F6;
+  --green: #22C55E;
+  --red: #EF4444;
+  --amber: #F59E0B;
+  --purple: #A78BFA;
+  --cyan: #06B6D4;
+  --rose: #F43F5E;
+
+  /* Node category colors */
+  --node-io: #3B82F6;
+  --node-ai: #A78BFA;
+  --node-tool: #22C55E;
+  --node-flow: #F59E0B;
+  --node-data: #06B6D4;
+  --node-action: #F43F5E;
+
+  /* Glow */
+  --glow: 0 0 0 transparent;
+}
+
+body.light {
+  --bg: #F8FAFC;
+  --sf: #FFFFFF;
+  --sf2: #F1F5F9;
+  --bd: #E2E8F0;
+  --tx: #0F172A;
+  --sb: #475569;
+  --dm: #94A3B8;
+  --hd: #0F172A;
+  --glass: rgba(255,255,255,0.85);
+  --glassBd: rgba(0,0,0,0.06);
+  --blue: #2563EB;
+  --green: #16A34A;
+  --red: #DC2626;
+  --amber: #D97706;
+  --purple: #7C3AED;
+  --cyan: #0891B2;
+  --glow: 0 0 0 transparent;
+}

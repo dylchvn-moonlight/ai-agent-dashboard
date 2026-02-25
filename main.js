@@ -805,6 +805,54 @@ ipcMain.handle('minimax-oauth:disconnect', async () => {
   }
 });
 
+// --- Business Assistant Chat (direct LLM call, bypasses agent engine) ---
+
+const LLMRouter = require('./llm-router');
+const assistantRouter = new LLMRouter();
+
+ipcMain.handle('assistant:chat', async (_event, { message, history, knowledgeContext }) => {
+  try {
+    const credentials = loadAllCredentials();
+    const settings = readJSON(SETTINGS_FILE) || {};
+
+    // Use default provider/model from settings, fall back to first configured provider
+    let provider = settings.defaultProvider || 'claude';
+    let model = settings.defaultModel || 'claude-sonnet-4-6';
+
+    // Build system prompt
+    let systemPrompt =
+      'You are a helpful business AI assistant. Provide clear, actionable answers. ' +
+      'When relevant, reference information from the knowledge base provided.';
+
+    if (knowledgeContext) {
+      systemPrompt += '\n\n' + knowledgeContext;
+    }
+
+    // Build the input string with conversation history
+    let fullInput = '';
+    if (history && history.length > 0) {
+      // Include last 20 messages for context
+      const recentHistory = history.slice(-20);
+      recentHistory.forEach((msg) => {
+        fullInput += `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.text}\n\n`;
+      });
+    }
+    fullInput += `User: ${message}`;
+
+    const result = await assistantRouter.call(provider, {
+      model,
+      systemPrompt,
+      temperature: 0.7,
+      maxTokens: 4096,
+    }, fullInput, credentials);
+
+    return { text: result.text, tokens: result.tokens, latency: result.latency };
+  } catch (e) {
+    console.error('assistant:chat failed:', e);
+    return { error: e.message || 'Failed to get response from LLM.' };
+  }
+});
+
 // --- In-App Update System ---
 
 ipcMain.handle('updates:check', async () => {

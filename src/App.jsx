@@ -16,6 +16,7 @@ import ResourceLibrary from '@/views/ResourceLibrary';
 import MediaLibrary from '@/views/MediaLibrary';
 import Settings from '@/views/Settings';
 import ChatbotBuilder from '@/views/ChatbotBuilder';
+import BusinessAssistant from '@/views/BusinessAssistant';
 
 const VIEW_MAP = {
   dashboard: Dashboard,
@@ -26,6 +27,7 @@ const VIEW_MAP = {
   resources: ResourceLibrary,
   media: MediaLibrary,
   chatbot: ChatbotBuilder,
+  assistant: BusinessAssistant,
   settings: Settings,
 };
 

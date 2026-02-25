@@ -54,6 +54,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getMiniMaxOAuthStatus: () => ipcRenderer.invoke('minimax-oauth:status'),
   disconnectMiniMaxOAuth: () => ipcRenderer.invoke('minimax-oauth:disconnect'),
 
+  // Business assistant (direct LLM chat)
+  assistantChat: (params) => ipcRenderer.invoke('assistant:chat', params),
+
   // Agent execution
   executeAgent: (agent, input, executionId) =>
     ipcRenderer.invoke('agent:execute', { agent, input, executionId }),

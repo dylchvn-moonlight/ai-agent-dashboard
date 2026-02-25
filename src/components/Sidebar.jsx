@@ -13,6 +13,7 @@ import {
   FolderOpen,
   HelpCircle,
   MessageCircle,
+  Briefcase,
 } from 'lucide-react';
 import useUiStore from '@/stores/ui-store';
 
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
   { id: 'resources', label: 'Resources', icon: Library },
   { id: 'media', label: 'Media Library', icon: FolderOpen },
   { id: 'chatbot', label: 'Chatbot', icon: MessageCircle },
+  { id: 'assistant', label: 'Assistant', icon: Briefcase },
   { id: 'settings', label: 'Settings', icon: Settings2 },
 ];
 

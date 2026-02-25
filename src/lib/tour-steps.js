@@ -225,6 +225,30 @@ export const TOUR_STEPS = {
     },
   ],
 
+  assistant: [
+    {
+      target: '[data-tour="assistant-view"]',
+      title: 'Business AI Assistant',
+      content: 'Your internal AI helper for employees. Ask questions, get analysis, draft documents, or brainstorm ideas.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="assistant-threads"]',
+      title: 'Conversation Threads',
+      content: 'Start new conversations and switch between them. Each thread maintains its own context for focused discussions.',
+      placement: 'right',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="assistant-chat"]',
+      title: 'Chat Interface',
+      content: 'Type your questions here. The assistant uses your configured LLM provider and any knowledge base entries for context.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+  ],
+
   settings: [
     {
       target: '[data-tour="settings-api-keys"]',

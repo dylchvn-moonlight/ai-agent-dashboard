@@ -444,13 +444,13 @@ export default function ExecutionMonitor() {
       const unsub = window.electronAPI.onExecutionComplete((data) => {
         if (data.metrics) {
           setLiveMetrics({
-            totalTime: data.metrics.totalTime || null,
-            totalTokensIn: data.metrics.inputTokens || 0,
-            totalTokensOut: data.metrics.outputTokens || 0,
-            totalTokens: (data.metrics.inputTokens || 0) + (data.metrics.outputTokens || 0),
-            completed: data.metrics.completedNodes || 0,
-            failed: data.metrics.failedNodes || 0,
-            totalNodes: data.metrics.totalNodes || 0,
+            totalTime: data.metrics.totalDuration || null,
+            totalTokensIn: data.metrics.totalTokensIn || 0,
+            totalTokensOut: data.metrics.totalTokensOut || 0,
+            totalTokens: (data.metrics.totalTokensIn || 0) + (data.metrics.totalTokensOut || 0),
+            completed: data.metrics.successCount || 0,
+            failed: data.metrics.failCount || 0,
+            totalNodes: data.metrics.nodeCount || 0,
             status: data.success ? 'completed' : 'failed',
           });
         }
@@ -510,9 +510,9 @@ export default function ExecutionMonitor() {
 
   const handleStop = useCallback(() => {
     if (window.electronAPI?.stopAgent) {
-      window.electronAPI.stopAgent();
+      window.electronAPI.stopAgent(activeExecutionId);
     }
-  }, []);
+  }, [activeExecutionId]);
 
   const handleSelectHistory = useCallback(
     (id) => {

@@ -55,8 +55,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   disconnectMiniMaxOAuth: () => ipcRenderer.invoke('minimax-oauth:disconnect'),
 
   // Agent execution
-  executeAgent: (agent, input) =>
-    ipcRenderer.invoke('agent:execute', { agent, input }),
+  executeAgent: (agent, input, executionId) =>
+    ipcRenderer.invoke('agent:execute', { agent, input, executionId }),
   stopAgent: (executionId) =>
     ipcRenderer.invoke('agent:stop', executionId),
 

@@ -162,10 +162,10 @@ class AgentEngine {
    * @param {object} settings    - { defaultProvider, defaultModel, temperature, maxTokens, streaming }
    * @returns {Promise<{ success: boolean, output: *, trace: object[], metrics: object }>}
    */
-  async execute(agent, input, credentials = {}, settings = {}) {
-    const executionId = uid();
+  async execute(agent, input, credentials = {}, settings = {}, executionId) {
+    const execId = executionId || uid();
     const abortController = new AbortController();
-    this.executions.set(executionId, { abortController });
+    this.executions.set(execId, { abortController });
 
     const nodes = agent.flow?.nodes || [];
     const edges = agent.flow?.edges || [];
@@ -204,7 +204,7 @@ class AgentEngine {
 
         // Notify renderer that this step is starting
         sendEvent('execution:step', {
-          executionId,
+          executionId: execId,
           nodeId,
           nodeType,
           label: nodeLabel,
@@ -231,7 +231,7 @@ class AgentEngine {
             settings,
             skipSet,
             abortController.signal,
-            executionId
+            execId
           );
 
           if (result && typeof result === 'object' && result.__engineResult) {
@@ -273,13 +273,15 @@ class AgentEngine {
 
         // Notify renderer of step result
         sendEvent('execution:step', {
-          executionId,
+          executionId: execId,
           nodeId,
           nodeType,
           label: nodeLabel,
           status,
           input: nodeInput,
           output: stringify(output),
+          startTime: stepStart,
+          endTime: stepEnd,
           duration: stepEnd - stepStart,
           tokens,
           error,
@@ -308,7 +310,7 @@ class AgentEngine {
 
       const result = {
         success: true,
-        executionId,
+        executionId: execId,
         output: stringify(finalOutput),
         trace,
         metrics,
@@ -319,7 +321,7 @@ class AgentEngine {
     } catch (err) {
       const errorResult = {
         success: false,
-        executionId,
+        executionId: execId,
         output: null,
         trace,
         error: err.message || String(err),
@@ -336,7 +338,7 @@ class AgentEngine {
       sendEvent('execution:error', errorResult);
       return errorResult;
     } finally {
-      this.executions.delete(executionId);
+      this.executions.delete(execId);
     }
   }
 

@@ -6,7 +6,7 @@ import {
   MiniMap,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Play, Save, Workflow, Loader2, Square, X } from 'lucide-react';
+import { Play, Save, Workflow, Loader2, Square, X, LayoutTemplate } from 'lucide-react';
 import { toast } from 'sonner';
 
 import useUiStore from '@/stores/ui-store';
@@ -17,6 +17,7 @@ import { NODE_DEFINITIONS } from '@/lib/node-types';
 import { nodeTypes } from '@/nodes';
 import NodePanel from '@/components/NodePanel';
 import NodeConfig from '@/components/NodeConfig';
+import { AGENT_TEMPLATES } from '@/lib/agent-templates';
 
 export default function AgentBuilder() {
   const activeAgentId = useUiStore((s) => s.activeAgentId);
@@ -33,12 +34,17 @@ export default function AgentBuilder() {
   const selectedNodeId = useFlowStore((s) => s.selectedNodeId);
 
   const isRunning = useExecutionStore((s) => s.isRunning);
+  const activeExecutionId = useExecutionStore((s) => s.activeExecutionId);
   const startExecution = useExecutionStore((s) => s.startExecution);
+
+  const createAgentFromStore = useAgentStore((s) => s.createAgent);
+  const goToAgent = useUiStore((s) => s.goToAgent);
 
   const reactFlowWrapper = useRef(null);
   const [reactFlowInstance, setReactFlowInstance] = React.useState(null);
   const [showRunDialog, setShowRunDialog] = React.useState(false);
   const [runInput, setRunInput] = React.useState('');
+  const [showTemplates, setShowTemplates] = React.useState(false);
 
   /* Load agent flow when active agent changes */
   const loadFlow = useFlowStore((s) => s.setNodes);
@@ -128,13 +134,13 @@ export default function AgentBuilder() {
     };
     updateAgent(agent.id, { flow: agentWithFlow.flow });
 
-    startExecution(agent.id);
+    const execution = startExecution(agent.id);
     setShowRunDialog(false);
 
     toast.info('Running agent...');
 
     try {
-      const result = await window.electronAPI?.executeAgent(agentWithFlow, runInput);
+      const result = await window.electronAPI?.executeAgent(agentWithFlow, runInput, execution.id);
       if (result?.success) {
         toast.success('Agent execution completed');
       } else {
@@ -146,6 +152,21 @@ export default function AgentBuilder() {
     }
     setRunInput('');
   }, [agent, isRunning, runInput, startExecution, updateAgent]);
+
+  /* Handle selecting a template */
+  const handleSelectTemplate = useCallback((template) => {
+    const newAgent = createAgentFromStore({
+      name: template.name,
+      description: template.description,
+      icon: template.icon,
+      color: template.color,
+      flow: template.flow,
+      config: template.config || {},
+    });
+    goToAgent(newAgent.id);
+    setShowTemplates(false);
+    toast.success(`Created agent from "${template.name}" template`);
+  }, [createAgentFromStore, goToAgent]);
 
   /* No agent selected — placeholder */
   if (!agent) {
@@ -187,6 +208,13 @@ export default function AgentBuilder() {
 
           <div className="flex items-center gap-2">
             <button
+              onClick={() => setShowTemplates(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--glassBd)] hover:bg-white/5 rounded-lg text-[var(--sb)] transition-colors"
+            >
+              <LayoutTemplate size={13} />
+              Templates
+            </button>
+            <button
               onClick={handleSave}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--glassBd)] hover:bg-white/5 rounded-lg text-[var(--sb)] transition-colors"
             >
@@ -194,7 +222,13 @@ export default function AgentBuilder() {
               Save
             </button>
             <button
-              onClick={() => isRunning ? window.electronAPI?.stopAgent() : setShowRunDialog(true)}
+              onClick={() => {
+                if (isRunning) {
+                  window.electronAPI?.stopAgent(activeExecutionId);
+                } else {
+                  setShowRunDialog(true);
+                }
+              }}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                 isRunning
                   ? 'bg-red-600 hover:bg-red-500 text-white'
@@ -309,6 +343,50 @@ export default function AgentBuilder() {
                 <Play size={12} />
                 Execute
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Templates Dialog */}
+      {showTemplates && (
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-[var(--sf)] border border-[var(--glassBd)] rounded-xl shadow-2xl w-[560px] max-h-[80vh] p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--hd)]">Agent Templates</h3>
+              <button
+                onClick={() => setShowTemplates(false)}
+                className="p-1 rounded hover:bg-white/5 text-[var(--dm)]"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <p className="text-xs text-[var(--dm)]">
+              Choose a template to create a pre-configured agent with nodes and connections ready to go.
+            </p>
+            <div className="grid grid-cols-2 gap-3 overflow-y-auto max-h-[55vh] pr-1">
+              {AGENT_TEMPLATES.map((tpl) => (
+                <button
+                  key={tpl.name}
+                  onClick={() => handleSelectTemplate(tpl)}
+                  className="flex items-start gap-3 p-3 rounded-xl border border-[var(--glassBd)] hover:border-blue-500/40 hover:bg-white/[0.03] transition-all text-left group"
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0 text-lg"
+                    style={{ backgroundColor: `color-mix(in srgb, ${tpl.color} 15%, transparent)` }}
+                  >
+                    {tpl.icon}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-[var(--hd)] group-hover:text-blue-400 transition-colors">
+                      {tpl.name}
+                    </p>
+                    <p className="text-[10px] text-[var(--dm)] mt-0.5 line-clamp-2">
+                      {tpl.description}
+                    </p>
+                  </div>
+                </button>
+              ))}
             </div>
           </div>
         </div>

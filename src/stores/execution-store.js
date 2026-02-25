@@ -64,8 +64,8 @@ const useExecutionStore = create((set, get) => ({
             }
           : ex
       ),
-      isRunning:
-        state.activeExecutionId === executionId ? false : state.isRunning,
+      // Always clear isRunning — only one execution is active at a time
+      isRunning: false,
     }));
   },
 
@@ -81,8 +81,8 @@ const useExecutionStore = create((set, get) => ({
             }
           : ex
       ),
-      isRunning:
-        state.activeExecutionId === executionId ? false : state.isRunning,
+      // Always clear isRunning — only one execution is active at a time
+      isRunning: false,
     }));
   },
 

@@ -47,6 +47,19 @@ function writeJSON(filePath, data) {
 
 let mainWindow;
 
+// --- Single Instance Lock ---
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1440,
@@ -401,13 +414,13 @@ function loadAllCredentials() {
   return result;
 }
 
-ipcMain.handle('agent:execute', async (_event, { agent, input }) => {
+ipcMain.handle('agent:execute', async (_event, { agent, input, executionId }) => {
   try {
     // Gather credentials and settings from disk
     const credentials = loadAllCredentials();
     const settings = readJSON(SETTINGS_FILE) || {};
 
-    const result = await agentEngine.execute(agent, input, credentials, settings);
+    const result = await agentEngine.execute(agent, input, credentials, settings, executionId);
     return result;
   } catch (e) {
     console.error('agent:execute failed:', e);
@@ -844,6 +857,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  mainWindow = null;
   app.quit();
 });
 

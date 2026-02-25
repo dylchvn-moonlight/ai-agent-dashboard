@@ -18,11 +18,22 @@ import {
   Save,
   FolderOpen,
   X,
+  Brain,
 } from 'lucide-react';
 import useChatbotStore from '@/stores/chatbot-store';
 import { generateSystemPrompt, configToAgentFlow } from '@/lib/chatbot-template';
+import { generateWidget } from '@/lib/widget-generator';
 import useAgentStore from '@/stores/agent-store';
 import useUiStore from '@/stores/ui-store';
+import { toast } from 'sonner';
+
+const LLM_PROVIDERS = [
+  { value: 'claude', label: 'Claude (Anthropic)' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'kimi', label: 'Kimi (Moonshot)' },
+  { value: 'minimax', label: 'MiniMax' },
+  { value: 'local', label: 'Local / Custom' },
+];
 
 /* ─── Reusable section wrapper ─── */
 function Section({ icon: Icon, title, children, tourId }) {
@@ -98,6 +109,13 @@ export default function ChatbotBuilder() {
   const [prodDesc, setProdDesc] = useState('');
   const [prodPrice, setProdPrice] = useState('');
 
+  // LLM model list
+  const [llmModels, setLlmModels] = useState([]);
+
+  // Export widget state
+  const [showExport, setShowExport] = useState(false);
+  const [exportData, setExportData] = useState(null);
+
   // Preview state
   const [previewMessages, setPreviewMessages] = useState([]);
   const [previewInput, setPreviewInput] = useState('');
@@ -107,6 +125,22 @@ export default function ChatbotBuilder() {
   useEffect(() => {
     previewEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [previewMessages]);
+
+  // Fetch LLM models when provider changes
+  useEffect(() => {
+    if (!config) return;
+    const provider = config.provider || 'claude';
+    window.electronAPI?.fetchModels(provider).then((res) => {
+      if (res?.success && res.models?.length > 0) {
+        setLlmModels(res.models);
+        if (!res.models.includes(config.model)) {
+          update('model', res.models[0]);
+        }
+      } else {
+        setLlmModels([]);
+      }
+    }).catch(() => setLlmModels([]));
+  }, [config?.provider, activeConfigId]);
 
   // Reset preview when config changes
   useEffect(() => {
@@ -236,6 +270,17 @@ export default function ChatbotBuilder() {
           </div>
           <div className="flex items-center gap-2">
             <button
+              onClick={() => {
+                const data = generateWidget(config);
+                setExportData(data);
+                setShowExport(true);
+              }}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--glassBd)] hover:bg-white/5 text-[var(--sb)] text-xs font-medium transition-colors"
+            >
+              <Package size={14} />
+              Export Widget
+            </button>
+            <button
               onClick={handleGenerateAgent}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium transition-colors"
               data-tour="chatbot-generate"
@@ -286,6 +331,49 @@ export default function ChatbotBuilder() {
               rows={3}
             />
           </div>
+        </Section>
+
+        {/* ─── AI Model ─── */}
+        <Section icon={Brain} title="AI Model" tourId="chatbot-model">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <span className="text-xs font-medium text-[var(--sb)] mb-1 block">Provider</span>
+              <select
+                value={config.provider || 'claude'}
+                onChange={(e) => update('provider', e.target.value)}
+                className="w-full bg-[var(--bg)] border border-[var(--glassBd)] rounded-lg px-3 py-2 text-sm text-[var(--tx)] focus:outline-none focus:ring-1 focus:ring-blue-500/40 cursor-pointer"
+              >
+                {LLM_PROVIDERS.map((p) => (
+                  <option key={p.value} value={p.value}>{p.label}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <span className="text-xs font-medium text-[var(--sb)] mb-1 block">Model</span>
+              {llmModels.length > 0 ? (
+                <select
+                  value={config.model || ''}
+                  onChange={(e) => update('model', e.target.value)}
+                  className="w-full bg-[var(--bg)] border border-[var(--glassBd)] rounded-lg px-3 py-2 text-sm text-[var(--tx)] focus:outline-none focus:ring-1 focus:ring-blue-500/40 cursor-pointer"
+                >
+                  {llmModels.map((m) => (
+                    <option key={m} value={m}>{m}</option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={config.model || ''}
+                  onChange={(e) => update('model', e.target.value)}
+                  placeholder="e.g. claude-sonnet-4-6"
+                  className="w-full bg-[var(--bg)] border border-[var(--glassBd)] rounded-lg px-3 py-2 text-sm text-[var(--tx)] placeholder:text-[var(--dm)] focus:outline-none focus:ring-1 focus:ring-blue-500/40"
+                />
+              )}
+            </div>
+          </div>
+          <p className="text-[10px] text-[var(--dm)] mt-2">
+            The generated agent will use this AI model for responses.
+          </p>
         </Section>
 
         {/* ─── Knowledge Base ─── */}
@@ -589,6 +677,87 @@ export default function ChatbotBuilder() {
           </details>
         </div>
       </div>
+
+      {/* Export Widget Modal */}
+      {showExport && exportData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <div className="bg-[var(--sf)] border border-[var(--glassBd)] rounded-xl shadow-2xl w-[540px] max-h-[80vh] overflow-y-auto p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-[var(--hd)]">Export Chat Widget</h3>
+              <button
+                onClick={() => setShowExport(false)}
+                className="p-1 rounded hover:bg-white/5 text-[var(--dm)]"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <p className="text-xs text-[var(--dm)]">
+              Your chat widget is ready. Download the HTML file or copy the embed code to add it to your website.
+            </p>
+
+            {/* Embed Code */}
+            <div>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-medium text-[var(--sb)] uppercase tracking-wider">Embed Code</span>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(exportData.embedSnippet);
+                    toast.success('Embed code copied to clipboard');
+                  }}
+                  className="text-[10px] text-blue-400 hover:underline"
+                >
+                  Copy
+                </button>
+              </div>
+              <pre className="p-3 bg-[var(--bg)] rounded-lg text-[10px] text-[var(--dm)] font-mono whitespace-pre-wrap max-h-32 overflow-y-auto">
+                {exportData.embedSnippet}
+              </pre>
+            </div>
+
+            {/* Setup Instructions */}
+            <div>
+              <span className="text-[11px] font-medium text-[var(--sb)] uppercase tracking-wider block mb-1.5">Setup Instructions</span>
+              <div className="text-xs text-[var(--dm)] space-y-1.5 bg-[var(--bg)] rounded-lg p-3">
+                <p><strong className="text-[var(--tx)]">1.</strong> Download the HTML file using the button below.</p>
+                <p><strong className="text-[var(--tx)]">2.</strong> Host it on your web server or static hosting (Netlify, Vercel, etc.).</p>
+                <p><strong className="text-[var(--tx)]">3.</strong> Update <code className="text-blue-400">YOUR_HOSTED_WIDGET_URL</code> in the embed code with the hosted URL.</p>
+                <p><strong className="text-[var(--tx)]">4.</strong> Paste the embed code into your website's HTML before <code className="text-blue-400">&lt;/body&gt;</code>.</p>
+                <p><strong className="text-[var(--tx)]">5.</strong> <em>Optional:</em> Set the <code className="text-blue-400">API_ENDPOINT</code> variable in the HTML for live LLM responses.</p>
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-2 pt-2">
+              <button
+                onClick={() => setShowExport(false)}
+                className="px-3 py-1.5 border border-[var(--glassBd)] hover:bg-white/5 text-[var(--sb)] text-xs rounded-lg transition-colors"
+              >
+                Close
+              </button>
+              <button
+                onClick={async () => {
+                  const name = `${(config.businessName || 'chatbot').toLowerCase().replace(/\s+/g, '-')}-widget.html`;
+                  const result = await window.electronAPI?.saveWidget({
+                    htmlContent: exportData.htmlContent,
+                    suggestedName: name,
+                  });
+                  if (result?.success) {
+                    toast.success('Widget saved successfully');
+                    setShowExport(false);
+                  } else if (!result?.canceled) {
+                    toast.error(result?.error || 'Failed to save widget');
+                  }
+                }}
+                className="flex items-center gap-2 px-4 py-1.5 bg-blue-600 hover:bg-blue-500 text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                <Save size={13} />
+                Download Widget
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

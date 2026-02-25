@@ -39,6 +39,13 @@ import DeduplicateNode from './DeduplicateNode';
 import CalculatorNode from './CalculatorNode';
 import SearchNode from './SearchNode';
 import WikipediaNode from './WikipediaNode';
+// v0.7.0 — Integrations
+import GmailNode from './GmailNode';
+import GoogleSheetsNode from './GoogleSheetsNode';
+import YouTubeNode from './YouTubeNode';
+import SlackNode from './SlackNode';
+import TelegramNode from './TelegramNode';
+import AirtableNode from './AirtableNode';
 
 export const nodeTypes = {
   InputNode,
@@ -78,6 +85,12 @@ export const nodeTypes = {
   CalculatorNode,
   SearchNode,
   WikipediaNode,
+  GmailNode,
+  GoogleSheetsNode,
+  YouTubeNode,
+  SlackNode,
+  TelegramNode,
+  AirtableNode,
 };
 
 export {
@@ -118,4 +131,10 @@ export {
   CalculatorNode,
   SearchNode,
   WikipediaNode,
+  GmailNode,
+  GoogleSheetsNode,
+  YouTubeNode,
+  SlackNode,
+  TelegramNode,
+  AirtableNode,
 };

@@ -76,6 +76,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('artifact:created', handler);
   },
 
+  // Widget export
+  saveWidget: (params) => ipcRenderer.invoke('widget:save', params),
+
   // Email
   sendEmail: (message) => ipcRenderer.invoke('email:send', message),
   testEmailConnection: () => ipcRenderer.invoke('email:test'),

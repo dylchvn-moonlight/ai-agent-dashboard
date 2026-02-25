@@ -6,6 +6,13 @@ const useAssistantStore = create((set, get) => ({
   conversations: [],
   activeConversationId: null,
 
+  // LLM selection
+  selectedProvider: 'claude',
+  selectedModel: 'claude-sonnet-4-6',
+
+  setProvider: (provider) => set({ selectedProvider: provider }),
+  setModel: (model) => set({ selectedModel: model }),
+
   // Knowledge base
   knowledgeBase: [], // [{ id, title, content, category, createdAt }]
 

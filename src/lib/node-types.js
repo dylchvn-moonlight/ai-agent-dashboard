@@ -7,6 +7,8 @@ import {
   Tags, Smile, FileSearch, AlignLeft, MessageCircleQuestion,
   Timer, Webhook, MessageSquarePlus,
   ArrowUpDown, Sigma, ListFilter, Calculator, Search, BookOpen,
+  // v0.7.0 — Integration icons
+  Table, Youtube, Hash,
 } from 'lucide-react';
 
 export const NODE_CATEGORIES = {
@@ -49,6 +51,11 @@ export const NODE_CATEGORIES = {
     color: 'var(--node-action)',
     colorClass: 'node-action',
     nodes: ['EmailNode', 'PDFNode', 'DocxNode', 'BlogNode', 'VideoNode'],
+  },
+  'Integrations': {
+    color: 'var(--node-integration)',
+    colorClass: 'node-integration',
+    nodes: ['GmailNode', 'GoogleSheetsNode', 'YouTubeNode', 'SlackNode', 'TelegramNode', 'AirtableNode'],
   },
 };
 
@@ -149,7 +156,7 @@ export const NODE_DEFINITIONS = {
     icon: Code,
     category: 'Tools',
     color: 'var(--node-tool)',
-    description: 'Run JavaScript or Python code',
+    description: 'Run JavaScript code',
     defaultData: {
       label: 'Code',
       language: 'javascript',
@@ -510,10 +517,10 @@ export const NODE_DEFINITIONS = {
     icon: Search,
     category: 'Tools',
     color: 'var(--node-tool)',
-    description: 'Web search via SerpApi',
+    description: 'Web search via DuckDuckGo',
     defaultData: {
       label: 'Web Search',
-      searchEngine: 'SerpApi',
+      searchEngine: 'duckduckgo',
       maxResults: 5,
     },
   },
@@ -527,6 +534,97 @@ export const NODE_DEFINITIONS = {
       label: 'Wikipedia',
       language: 'en',
       sections: 'summary',
+    },
+  },
+
+  /* ─── v0.7.0 — Integrations ─── */
+  GmailNode: {
+    label: 'Gmail',
+    icon: Mail,
+    category: 'Integrations',
+    color: 'var(--node-integration)',
+    description: 'Send, read, or search Gmail emails',
+    defaultData: {
+      label: 'Gmail',
+      operation: 'send',
+      to: '',
+      subject: '',
+      bodyTemplate: '{{input}}',
+      labelFilter: '',
+      maxResults: 10,
+    },
+  },
+  GoogleSheetsNode: {
+    label: 'Google Sheets',
+    icon: Table,
+    category: 'Integrations',
+    color: 'var(--node-integration)',
+    description: 'Read, write, or append Google Sheets data',
+    defaultData: {
+      label: 'Google Sheets',
+      operation: 'read',
+      spreadsheetId: '',
+      sheetName: 'Sheet1',
+      range: 'A1:Z100',
+      rowData: '',
+    },
+  },
+  YouTubeNode: {
+    label: 'YouTube',
+    icon: Youtube,
+    category: 'Integrations',
+    color: 'var(--node-integration)',
+    description: 'Search videos, get info, or fetch captions',
+    defaultData: {
+      label: 'YouTube',
+      operation: 'search',
+      query: '',
+      videoId: '',
+      maxResults: 5,
+      captionLanguage: 'en',
+    },
+  },
+  SlackNode: {
+    label: 'Slack',
+    icon: Hash,
+    category: 'Integrations',
+    color: 'var(--node-integration)',
+    description: 'Send or read Slack messages',
+    defaultData: {
+      label: 'Slack',
+      operation: 'send',
+      channel: '',
+      messageTemplate: '{{input}}',
+    },
+  },
+  TelegramNode: {
+    label: 'Telegram',
+    icon: Send,
+    category: 'Integrations',
+    color: 'var(--node-integration)',
+    description: 'Send messages or photos via Telegram bot',
+    defaultData: {
+      label: 'Telegram',
+      operation: 'send_message',
+      chatId: '',
+      messageTemplate: '{{input}}',
+      photoUrl: '',
+    },
+  },
+  AirtableNode: {
+    label: 'Airtable',
+    icon: Database,
+    category: 'Integrations',
+    color: 'var(--node-integration)',
+    description: 'List, create, update, or delete Airtable records',
+    defaultData: {
+      label: 'Airtable',
+      operation: 'list',
+      baseId: '',
+      tableName: '',
+      fields: '',
+      filterFormula: '',
+      recordId: '',
     },
   },
 };

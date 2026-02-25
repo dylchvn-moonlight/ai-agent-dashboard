@@ -7,10 +7,19 @@ import {
   MessageSquare,
   Loader2,
   BookOpen,
+  Brain,
 } from 'lucide-react';
 import useAssistantStore from '@/stores/assistant-store';
 import ChatMessage from '@/components/ChatMessage';
 import KnowledgeBasePanel from '@/components/KnowledgeBasePanel';
+
+const PROVIDERS = [
+  { value: 'claude', label: 'Claude' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'kimi', label: 'Kimi' },
+  { value: 'minimax', label: 'MiniMax' },
+  { value: 'local', label: 'Local' },
+];
 
 export default function BusinessAssistant() {
   const conversations = useAssistantStore((s) => s.conversations);
@@ -21,11 +30,30 @@ export default function BusinessAssistant() {
   const getActiveConversation = useAssistantStore((s) => s.getActiveConversation);
   const addMessage = useAssistantStore((s) => s.addMessage);
   const getKnowledgeContext = useAssistantStore((s) => s.getKnowledgeContext);
+  const selectedProvider = useAssistantStore((s) => s.selectedProvider);
+  const selectedModel = useAssistantStore((s) => s.selectedModel);
+  const setProvider = useAssistantStore((s) => s.setProvider);
+  const setModel = useAssistantStore((s) => s.setModel);
 
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [kbCollapsed, setKbCollapsed] = useState(false);
+  const [models, setModels] = useState([]);
   const messagesEndRef = useRef(null);
+
+  // Fetch models when provider changes
+  useEffect(() => {
+    window.electronAPI?.fetchModels(selectedProvider).then((res) => {
+      if (res?.success && res.models?.length > 0) {
+        setModels(res.models);
+        if (!res.models.includes(selectedModel)) {
+          setModel(res.models[0]);
+        }
+      } else {
+        setModels([]);
+      }
+    }).catch(() => setModels([]));
+  }, [selectedProvider]);
 
   const activeConvo = getActiveConversation();
 
@@ -63,11 +91,13 @@ export default function BusinessAssistant() {
       // Get knowledge base context
       const knowledgeContext = getKnowledgeContext();
 
-      // Call LLM via IPC
+      // Call LLM via IPC with selected provider/model
       const result = await window.electronAPI?.assistantChat({
         message: userMessage,
         history,
         knowledgeContext,
+        provider: selectedProvider,
+        model: selectedModel,
       });
 
       if (result?.text) {
@@ -143,9 +173,37 @@ export default function BusinessAssistant() {
               <span className="text-xs font-semibold text-[var(--hd)] truncate">
                 {activeConvo.title}
               </span>
-              <span className="text-[10px] text-[var(--dm)] ml-auto">
-                {activeConvo.messages.length} messages
-              </span>
+              <div className="ml-auto flex items-center gap-2">
+                <Brain size={12} className="text-[var(--dm)]" />
+                <select
+                  value={selectedProvider}
+                  onChange={(e) => setProvider(e.target.value)}
+                  className="bg-[var(--bg)] border border-[var(--glassBd)] rounded-md px-2 py-1 text-[10px] text-[var(--tx)] outline-none cursor-pointer"
+                >
+                  {PROVIDERS.map((p) => (
+                    <option key={p.value} value={p.value}>{p.label}</option>
+                  ))}
+                </select>
+                {models.length > 0 ? (
+                  <select
+                    value={selectedModel}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="bg-[var(--bg)] border border-[var(--glassBd)] rounded-md px-2 py-1 text-[10px] text-[var(--tx)] outline-none cursor-pointer max-w-[180px]"
+                  >
+                    {models.map((m) => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={selectedModel}
+                    onChange={(e) => setModel(e.target.value)}
+                    placeholder="Model name"
+                    className="bg-[var(--bg)] border border-[var(--glassBd)] rounded-md px-2 py-1 text-[10px] text-[var(--tx)] outline-none w-36"
+                  />
+                )}
+              </div>
             </div>
 
             {/* Messages */}

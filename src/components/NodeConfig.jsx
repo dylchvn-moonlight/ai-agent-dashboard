@@ -107,6 +107,13 @@ export default function NodeConfig({ node }) {
         {node.type === 'CalculatorNode' && <CalculatorFields data={node.data} update={update} />}
         {node.type === 'SearchNode' && <SearchFields data={node.data} update={update} />}
         {node.type === 'WikipediaNode' && <WikipediaFields data={node.data} update={update} />}
+        {/* v0.7.0 — Integrations */}
+        {node.type === 'GmailNode' && <GmailFields data={node.data} update={update} />}
+        {node.type === 'GoogleSheetsNode' && <GoogleSheetsFields data={node.data} update={update} />}
+        {node.type === 'YouTubeNode' && <YouTubeFields data={node.data} update={update} />}
+        {node.type === 'SlackNode' && <SlackFields data={node.data} update={update} />}
+        {node.type === 'TelegramNode' && <TelegramFields data={node.data} update={update} />}
+        {node.type === 'AirtableNode' && <AirtableFields data={node.data} update={update} />}
       </div>
     </div>
   );
@@ -115,6 +122,33 @@ export default function NodeConfig({ node }) {
 /* ─── Type-Specific Field Groups ─── */
 
 function LLMFields({ data, update }) {
+  const [models, setModels] = React.useState([]);
+  const [loadingModels, setLoadingModels] = React.useState(false);
+  const [customModel, setCustomModel] = React.useState(false);
+
+  React.useEffect(() => {
+    const provider = data.provider || 'claude';
+    setLoadingModels(true);
+    setCustomModel(false);
+    window.electronAPI?.fetchModels(provider).then((res) => {
+      if (res?.success && res.models?.length > 0) {
+        setModels(res.models);
+        // Auto-select first model if current model isn't in the list
+        if (!res.models.includes(data.model)) {
+          update('model', res.models[0]);
+        }
+      } else {
+        setModels([]);
+        setCustomModel(true);
+      }
+      setLoadingModels(false);
+    }).catch(() => {
+      setModels([]);
+      setCustomModel(true);
+      setLoadingModels(false);
+    });
+  }, [data.provider]);
+
   return (
     <>
       <Field label="Provider">
@@ -130,12 +164,42 @@ function LLMFields({ data, update }) {
           ]}
         />
       </Field>
-      <Field label="Model">
-        <TextInput
-          value={data.model || ''}
-          onChange={(v) => update('model', v)}
-          placeholder="e.g. claude-sonnet-4-6"
-        />
+      <Field label={loadingModels ? 'Model (loading...)' : 'Model'}>
+        {customModel || models.length === 0 ? (
+          <>
+            <TextInput
+              value={data.model || ''}
+              onChange={(v) => update('model', v)}
+              placeholder="e.g. claude-sonnet-4-6"
+            />
+            {models.length > 0 && (
+              <button
+                onClick={() => setCustomModel(false)}
+                className="text-[10px] text-blue-400 hover:underline mt-1"
+              >
+                Back to model list
+              </button>
+            )}
+          </>
+        ) : (
+          <>
+            <SelectInput
+              value={data.model || ''}
+              onChange={(v) => {
+                if (v === '__custom__') {
+                  setCustomModel(true);
+                  update('model', '');
+                } else {
+                  update('model', v);
+                }
+              }}
+              options={[
+                ...models.map((m) => ({ value: m, label: m })),
+                { value: '__custom__', label: 'Custom...' },
+              ]}
+            />
+          </>
+        )}
       </Field>
       <Field label="System Prompt">
         <TextArea
@@ -305,19 +369,21 @@ function CodeFields({ data, update }) {
     <>
       <Field label="Language">
         <SelectInput
-          value={data.language || 'javascript'}
-          onChange={(v) => update('language', v)}
+          value="javascript"
+          onChange={() => {}}
           options={[
             { value: 'javascript', label: 'JavaScript' },
-            { value: 'python', label: 'Python' },
           ]}
         />
+        <p className="text-[10px] text-[var(--dm)] mt-1">
+          JavaScript only. Access upstream data via <code className="text-blue-400">input</code> and <code className="text-blue-400">context</code>.
+        </p>
       </Field>
       <Field label="Code">
         <TextArea
           value={data.code || ''}
           onChange={(v) => update('code', v)}
-          placeholder="// Write your code here..."
+          placeholder="// Transform data here\nreturn input;"
           rows={8}
           mono
         />
@@ -439,29 +505,49 @@ function RouterFields({ data, update }) {
 }
 
 function TransformFields({ data, update }) {
+  const placeholders = {
+    template: 'Use {{input}} for upstream data',
+    jsonpath: 'e.g. data.results.0.name',
+    regex: 'e.g. \\d{3}-\\d{4}',
+    uppercase: 'No expression needed',
+    lowercase: 'No expression needed',
+    trim: 'No expression needed',
+    split: 'Delimiter character (default: comma)',
+    join: 'Join string (default: ", ")',
+    code: 'return input.toUpperCase();',
+  };
+  const t = data.transformType || 'template';
+  const needsExpression = !['uppercase', 'lowercase', 'trim'].includes(t);
   return (
     <>
       <Field label="Transform Type">
         <SelectInput
-          value={data.transformType || 'template'}
+          value={t}
           onChange={(v) => update('transformType', v)}
           options={[
-            { value: 'template', label: 'Template' },
-            { value: 'map', label: 'Map' },
-            { value: 'filter', label: 'Filter' },
-            { value: 'reduce', label: 'Reduce' },
+            { value: 'template', label: 'Template ({{input}})' },
+            { value: 'jsonpath', label: 'JSON Path' },
+            { value: 'regex', label: 'Regex Extract' },
+            { value: 'uppercase', label: 'Uppercase' },
+            { value: 'lowercase', label: 'Lowercase' },
+            { value: 'trim', label: 'Trim Whitespace' },
+            { value: 'split', label: 'Split to Array' },
+            { value: 'join', label: 'Join Array' },
+            { value: 'code', label: 'Custom Code (JS)' },
           ]}
         />
       </Field>
-      <Field label="Expression">
-        <TextArea
-          value={data.expression || ''}
-          onChange={(v) => update('expression', v)}
-          placeholder="Transform expression..."
-          rows={4}
-          mono
-        />
-      </Field>
+      {needsExpression && (
+        <Field label="Expression">
+          <TextArea
+            value={data.expression || ''}
+            onChange={(v) => update('expression', v)}
+            placeholder={placeholders[t] || 'Transform expression...'}
+            rows={t === 'code' ? 6 : 3}
+            mono
+          />
+        </Field>
+      )}
     </>
   );
 }
@@ -1030,6 +1116,16 @@ function QAChainFields({ data, update }) {
           ]}
         />
       </Field>
+      {data.contextSource === 'manual' && (
+        <Field label="Manual Context">
+          <TextArea
+            value={data.manualContext || ''}
+            onChange={(v) => update('manualContext', v)}
+            placeholder="Paste reference text the LLM should answer from..."
+            rows={6}
+          />
+        </Field>
+      )}
       <Field label="Response Style">
         <SelectInput
           value={data.responseStyle || 'detailed'}
@@ -1056,6 +1152,9 @@ function ScheduleTriggerFields({ data, update }) {
           onChange={(v) => update('cronExpression', v)}
           placeholder="0 * * * *"
         />
+        <p className="text-[10px] text-[var(--dm)] mt-1">
+          Format: minute hour day-of-month month day-of-week
+        </p>
       </Field>
       <Field label="Timezone">
         <TextInput
@@ -1063,6 +1162,9 @@ function ScheduleTriggerFields({ data, update }) {
           onChange={(v) => update('timezone', v)}
           placeholder="UTC"
         />
+        <p className="text-[10px] text-[var(--dm)] mt-1">
+          For planning reference only. Cron scheduling requires deployment.
+        </p>
       </Field>
     </>
   );
@@ -1188,10 +1290,10 @@ function SearchFields({ data, update }) {
     <>
       <Field label="Search Engine">
         <SelectInput
-          value={data.searchEngine || 'SerpApi'}
+          value={data.searchEngine || 'duckduckgo'}
           onChange={(v) => update('searchEngine', v)}
           options={[
-            { value: 'SerpApi', label: 'SerpApi (Google)' },
+            { value: 'duckduckgo', label: 'DuckDuckGo' },
           ]}
         />
       </Field>
@@ -1293,5 +1395,249 @@ function SelectInput({ value, onChange, options }) {
         </option>
       ))}
     </select>
+  );
+}
+
+/* ─── v0.7.0 — Integration Field Groups ─── */
+
+function GmailFields({ data, update }) {
+  return (
+    <>
+      <FieldGroup label="Operation">
+        <SelectInput
+          value={data.operation || 'send'}
+          onChange={(v) => update('operation', v)}
+          options={[
+            { value: 'send', label: 'Send Email' },
+            { value: 'read', label: 'Read Emails' },
+            { value: 'search', label: 'Search Emails' },
+          ]}
+        />
+      </FieldGroup>
+      {(data.operation === 'send' || !data.operation) && (
+        <>
+          <FieldGroup label="To">
+            <TextInput value={data.to || ''} onChange={(v) => update('to', v)} placeholder="recipient@example.com" />
+          </FieldGroup>
+          <FieldGroup label="Subject">
+            <TextInput value={data.subject || ''} onChange={(v) => update('subject', v)} placeholder="Email subject" />
+          </FieldGroup>
+          <FieldGroup label="Body Template">
+            <TextArea value={data.bodyTemplate || '{{input}}'} onChange={(v) => update('bodyTemplate', v)} placeholder="Email body (use {{input}} for upstream data)" rows={3} />
+          </FieldGroup>
+        </>
+      )}
+      {data.operation === 'read' && (
+        <>
+          <FieldGroup label="Label Filter">
+            <TextInput value={data.labelFilter || ''} onChange={(v) => update('labelFilter', v)} placeholder="INBOX, UNREAD, etc." />
+          </FieldGroup>
+          <FieldGroup label="Max Results">
+            <TextInput value={String(data.maxResults || 10)} onChange={(v) => update('maxResults', parseInt(v) || 10)} placeholder="10" />
+          </FieldGroup>
+        </>
+      )}
+      {data.operation === 'search' && (
+        <>
+          <FieldGroup label="Search Query">
+            <TextInput value={data.searchQuery || ''} onChange={(v) => update('searchQuery', v)} placeholder="from:user@example.com subject:invoice" />
+          </FieldGroup>
+          <FieldGroup label="Max Results">
+            <TextInput value={String(data.maxResults || 10)} onChange={(v) => update('maxResults', parseInt(v) || 10)} placeholder="10" />
+          </FieldGroup>
+        </>
+      )}
+      <p className="text-[10px] text-[var(--dm)] mt-1">Requires Google API key in Settings.</p>
+    </>
+  );
+}
+
+function GoogleSheetsFields({ data, update }) {
+  return (
+    <>
+      <FieldGroup label="Operation">
+        <SelectInput
+          value={data.operation || 'read'}
+          onChange={(v) => update('operation', v)}
+          options={[
+            { value: 'read', label: 'Read Rows' },
+            { value: 'write', label: 'Write Row' },
+            { value: 'append', label: 'Append Row' },
+            { value: 'update', label: 'Update Cell' },
+          ]}
+        />
+      </FieldGroup>
+      <FieldGroup label="Spreadsheet ID">
+        <TextInput value={data.spreadsheetId || ''} onChange={(v) => update('spreadsheetId', v)} placeholder="1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" />
+      </FieldGroup>
+      <FieldGroup label="Sheet Name">
+        <TextInput value={data.sheetName || ''} onChange={(v) => update('sheetName', v)} placeholder="Sheet1" />
+      </FieldGroup>
+      <FieldGroup label="Range (A1 notation)">
+        <TextInput value={data.range || ''} onChange={(v) => update('range', v)} placeholder="A1:Z100" />
+      </FieldGroup>
+      {(data.operation === 'write' || data.operation === 'append' || data.operation === 'update') && (
+        <FieldGroup label="Row Data (JSON or CSV)">
+          <TextArea value={data.rowData || ''} onChange={(v) => update('rowData', v)} placeholder='["value1", "value2"] or value1,value2' rows={2} mono />
+        </FieldGroup>
+      )}
+      <p className="text-[10px] text-[var(--dm)] mt-1">Requires Google API key in Settings.</p>
+    </>
+  );
+}
+
+function YouTubeFields({ data, update }) {
+  return (
+    <>
+      <FieldGroup label="Operation">
+        <SelectInput
+          value={data.operation || 'search'}
+          onChange={(v) => update('operation', v)}
+          options={[
+            { value: 'search', label: 'Search Videos' },
+            { value: 'info', label: 'Get Video Info' },
+            { value: 'captions', label: 'Get Captions' },
+          ]}
+        />
+      </FieldGroup>
+      {(data.operation === 'search' || !data.operation) && (
+        <>
+          <FieldGroup label="Search Query">
+            <TextInput value={data.query || ''} onChange={(v) => update('query', v)} placeholder="Search YouTube..." />
+          </FieldGroup>
+          <FieldGroup label="Max Results">
+            <TextInput value={String(data.maxResults || 5)} onChange={(v) => update('maxResults', parseInt(v) || 5)} placeholder="5" />
+          </FieldGroup>
+        </>
+      )}
+      {(data.operation === 'info' || data.operation === 'captions') && (
+        <FieldGroup label="Video ID">
+          <TextInput value={data.videoId || ''} onChange={(v) => update('videoId', v)} placeholder="dQw4w9WgXcQ" />
+        </FieldGroup>
+      )}
+      {data.operation === 'captions' && (
+        <FieldGroup label="Caption Language">
+          <TextInput value={data.captionLanguage || 'en'} onChange={(v) => update('captionLanguage', v)} placeholder="en" />
+        </FieldGroup>
+      )}
+      <p className="text-[10px] text-[var(--dm)] mt-1">Requires Google API key in Settings.</p>
+    </>
+  );
+}
+
+function SlackFields({ data, update }) {
+  return (
+    <>
+      <FieldGroup label="Operation">
+        <SelectInput
+          value={data.operation || 'send'}
+          onChange={(v) => update('operation', v)}
+          options={[
+            { value: 'send', label: 'Send Message' },
+            { value: 'read', label: 'Read Messages' },
+            { value: 'channels', label: 'List Channels' },
+          ]}
+        />
+      </FieldGroup>
+      {(data.operation === 'send' || !data.operation) && (
+        <>
+          <FieldGroup label="Channel">
+            <TextInput value={data.channel || ''} onChange={(v) => update('channel', v)} placeholder="#general or channel ID" />
+          </FieldGroup>
+          <FieldGroup label="Message Template">
+            <TextArea value={data.messageTemplate || '{{input}}'} onChange={(v) => update('messageTemplate', v)} placeholder="Message (use {{input}} for upstream)" rows={3} />
+          </FieldGroup>
+        </>
+      )}
+      {data.operation === 'read' && (
+        <>
+          <FieldGroup label="Channel">
+            <TextInput value={data.channel || ''} onChange={(v) => update('channel', v)} placeholder="#general or channel ID" />
+          </FieldGroup>
+          <FieldGroup label="Message Count">
+            <TextInput value={String(data.maxResults || 20)} onChange={(v) => update('maxResults', parseInt(v) || 20)} placeholder="20" />
+          </FieldGroup>
+        </>
+      )}
+      <p className="text-[10px] text-[var(--dm)] mt-1">Requires Slack Bot Token in Settings.</p>
+    </>
+  );
+}
+
+function TelegramFields({ data, update }) {
+  return (
+    <>
+      <FieldGroup label="Operation">
+        <SelectInput
+          value={data.operation || 'send_message'}
+          onChange={(v) => update('operation', v)}
+          options={[
+            { value: 'send_message', label: 'Send Message' },
+            { value: 'send_photo', label: 'Send Photo' },
+            { value: 'get_updates', label: 'Get Updates' },
+          ]}
+        />
+      </FieldGroup>
+      <FieldGroup label="Chat ID">
+        <TextInput value={data.chatId || ''} onChange={(v) => update('chatId', v)} placeholder="123456789" />
+      </FieldGroup>
+      {(data.operation === 'send_message' || !data.operation) && (
+        <FieldGroup label="Message Template">
+          <TextArea value={data.messageTemplate || '{{input}}'} onChange={(v) => update('messageTemplate', v)} placeholder="Message (use {{input}} for upstream)" rows={3} />
+        </FieldGroup>
+      )}
+      {data.operation === 'send_photo' && (
+        <>
+          <FieldGroup label="Photo URL">
+            <TextInput value={data.photoUrl || ''} onChange={(v) => update('photoUrl', v)} placeholder="https://example.com/photo.jpg" />
+          </FieldGroup>
+          <FieldGroup label="Caption">
+            <TextInput value={data.messageTemplate || ''} onChange={(v) => update('messageTemplate', v)} placeholder="Optional caption" />
+          </FieldGroup>
+        </>
+      )}
+      <p className="text-[10px] text-[var(--dm)] mt-1">Requires Telegram Bot Token in Settings.</p>
+    </>
+  );
+}
+
+function AirtableFields({ data, update }) {
+  return (
+    <>
+      <FieldGroup label="Operation">
+        <SelectInput
+          value={data.operation || 'list'}
+          onChange={(v) => update('operation', v)}
+          options={[
+            { value: 'list', label: 'List Records' },
+            { value: 'create', label: 'Create Record' },
+            { value: 'update', label: 'Update Record' },
+            { value: 'delete', label: 'Delete Record' },
+          ]}
+        />
+      </FieldGroup>
+      <FieldGroup label="Base ID">
+        <TextInput value={data.baseId || ''} onChange={(v) => update('baseId', v)} placeholder="appXXXXXXXXXXXXXX" />
+      </FieldGroup>
+      <FieldGroup label="Table Name">
+        <TextInput value={data.tableName || ''} onChange={(v) => update('tableName', v)} placeholder="Tasks" />
+      </FieldGroup>
+      {data.operation === 'list' && (
+        <FieldGroup label="Filter Formula">
+          <TextInput value={data.filterFormula || ''} onChange={(v) => update('filterFormula', v)} placeholder="{Status} = 'Active'" />
+        </FieldGroup>
+      )}
+      {(data.operation === 'create' || data.operation === 'update') && (
+        <FieldGroup label="Fields (JSON)">
+          <TextArea value={data.fields || ''} onChange={(v) => update('fields', v)} placeholder='{"Name": "New Record", "Status": "Active"}' rows={3} mono />
+        </FieldGroup>
+      )}
+      {(data.operation === 'update' || data.operation === 'delete') && (
+        <FieldGroup label="Record ID">
+          <TextInput value={data.recordId || ''} onChange={(v) => update('recordId', v)} placeholder="recXXXXXXXXXXXXXX" />
+        </FieldGroup>
+      )}
+      <p className="text-[10px] text-[var(--dm)] mt-1">Requires Airtable API Key in Settings.</p>
+    </>
   );
 }

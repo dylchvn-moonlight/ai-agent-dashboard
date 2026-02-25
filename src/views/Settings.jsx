@@ -28,6 +28,7 @@ import {
   RotateCcw,
   ArrowDownToLine,
   Mail,
+  Plug,
 } from 'lucide-react';
 import useUiStore from '@/stores/ui-store';
 import useAgentStore from '@/stores/agent-store';
@@ -316,6 +317,79 @@ function LocalEndpointRow() {
           Save
         </button>
         <div className="flex items-center">
+          {status === 'saved' && <Check size={14} className="text-[var(--green)]" />}
+          {status === 'error' && <AlertCircle size={14} className="text-[var(--red)]" />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Integration Credential Row (single key per service) ─── */
+function IntegrationCredentialRow({ credKey, label, placeholder, helpText }) {
+  const [value, setValue] = useState('');
+  const [masked, setMasked] = useState('');
+  const [status, setStatus] = useState('idle');
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const stored = await window.electronAPI?.loadCredential(credKey);
+        if (!cancelled && stored) {
+          setMasked(maskValue(stored));
+          setStatus('saved');
+        }
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [credKey]);
+
+  const handleSave = async () => {
+    if (!value.trim()) return;
+    setStatus('saving');
+    try {
+      await window.electronAPI?.saveCredential(credKey, value.trim());
+      setMasked(maskValue(value.trim()));
+      setValue('');
+      setVisible(false);
+      setStatus('saved');
+    } catch {
+      setStatus('error');
+    }
+  };
+
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-medium text-[var(--sb)]">{label}</label>
+      {helpText && <p className="text-[10px] text-[var(--dm)]">{helpText}</p>}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <input
+            type={visible ? 'text' : 'password'}
+            value={value}
+            onChange={(e) => { setValue(e.target.value); if (status === 'saved') setStatus('idle'); }}
+            placeholder={status === 'saved' ? masked : placeholder}
+            className="w-full bg-[var(--bg)] border border-[var(--glassBd)] rounded-lg text-xs text-[var(--tx)] px-3 py-2 pr-8 focus:outline-none focus:border-[var(--blue)] transition-colors font-mono"
+          />
+          <button
+            type="button"
+            onClick={() => setVisible(!visible)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--dm)] hover:text-[var(--sb)] transition-colors"
+          >
+            {visible ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+        <button
+          onClick={handleSave}
+          disabled={!value.trim() || status === 'saving'}
+          className="flex items-center gap-1.5 px-3 py-2 bg-[var(--blue)] hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors"
+        >
+          {status === 'saving' ? <Loader2 size={13} className="animate-spin" /> : <Save size={13} />}
+          Save
+        </button>
+        <div className="flex items-center w-5">
           {status === 'saved' && <Check size={14} className="text-[var(--green)]" />}
           {status === 'error' && <AlertCircle size={14} className="text-[var(--red)]" />}
         </div>
@@ -1043,6 +1117,22 @@ export default function Settings() {
           </div>
           <p className="text-[10px] text-[var(--dm)] mt-4">
             Keys are stored in encrypted OS-level credential storage and never leave your device.
+          </p>
+        </Section>
+
+        {/* ── Integration Credentials ── */}
+        <Section icon={Plug} title="Integration Credentials">
+          <div className="space-y-4">
+            <IntegrationCredentialRow credKey="google-api-key" label="Google API Key" placeholder="AIzaSy..." helpText="Used by Gmail, Google Sheets, and YouTube nodes." />
+            <div className="border-t border-[var(--glassBd)] pt-4" />
+            <IntegrationCredentialRow credKey="slack-bot-token" label="Slack Bot Token" placeholder="xoxb-..." helpText="Used by Slack node. Create a bot at api.slack.com." />
+            <div className="border-t border-[var(--glassBd)] pt-4" />
+            <IntegrationCredentialRow credKey="telegram-bot-token" label="Telegram Bot Token" placeholder="123456:ABC-DEF..." helpText="Used by Telegram node. Get from @BotFather." />
+            <div className="border-t border-[var(--glassBd)] pt-4" />
+            <IntegrationCredentialRow credKey="airtable-api-key" label="Airtable API Key" placeholder="pat..." helpText="Used by Airtable node. Create a personal access token." />
+          </div>
+          <p className="text-[10px] text-[var(--dm)] mt-4">
+            Integration credentials are encrypted and stored locally.
           </p>
         </Section>
 

@@ -810,14 +810,14 @@ ipcMain.handle('minimax-oauth:disconnect', async () => {
 const LLMRouter = require('./llm-router');
 const assistantRouter = new LLMRouter();
 
-ipcMain.handle('assistant:chat', async (_event, { message, history, knowledgeContext }) => {
+ipcMain.handle('assistant:chat', async (_event, { message, history, knowledgeContext, provider: reqProvider, model: reqModel }) => {
   try {
     const credentials = loadAllCredentials();
     const settings = readJSON(SETTINGS_FILE) || {};
 
-    // Use default provider/model from settings, fall back to first configured provider
-    let provider = settings.defaultProvider || 'claude';
-    let model = settings.defaultModel || 'claude-sonnet-4-6';
+    // Use requested provider/model, fall back to settings defaults
+    let provider = reqProvider || settings.defaultProvider || 'claude';
+    let model = reqModel || settings.defaultModel || 'claude-sonnet-4-6';
 
     // Build system prompt
     let systemPrompt =
@@ -850,6 +850,33 @@ ipcMain.handle('assistant:chat', async (_event, { message, history, knowledgeCon
   } catch (e) {
     console.error('assistant:chat failed:', e);
     return { error: e.message || 'Failed to get response from LLM.' };
+  }
+});
+
+// --- Widget Export ---
+
+const { dialog } = require('electron');
+
+ipcMain.handle('widget:save', async (_event, { htmlContent, suggestedName }) => {
+  try {
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: 'Save Chat Widget',
+      defaultPath: suggestedName || 'chat-widget.html',
+      filters: [
+        { name: 'HTML Files', extensions: ['html'] },
+        { name: 'All Files', extensions: ['*'] },
+      ],
+    });
+
+    if (result.canceled || !result.filePath) {
+      return { success: false, canceled: true };
+    }
+
+    fs.writeFileSync(result.filePath, htmlContent, 'utf-8');
+    return { success: true, filePath: result.filePath };
+  } catch (e) {
+    console.error('widget:save failed:', e);
+    return { success: false, error: e.message };
   }
 });
 

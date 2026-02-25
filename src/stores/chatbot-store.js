@@ -8,6 +8,10 @@ const DEFAULT_CONFIG = {
   industry: '',
   website: '',
 
+  // AI Model
+  provider: 'claude',
+  model: 'claude-sonnet-4-6',
+
   // Knowledge Base
   faqs: [],           // [{ question, answer }]
   products: [],       // [{ name, description, price }]

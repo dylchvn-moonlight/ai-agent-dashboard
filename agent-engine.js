@@ -483,6 +483,20 @@ class AgentEngine {
       case 'WikipediaNode':
         return this._execWikipedia(nodeData, nodeInput, signal);
 
+      /* ─── v0.7.0 — Integrations ─── */
+      case 'GmailNode':
+        return this._execGmail(nodeData, nodeInput, credentials, signal);
+      case 'GoogleSheetsNode':
+        return this._execGoogleSheets(nodeData, nodeInput, credentials, signal);
+      case 'YouTubeNode':
+        return this._execYouTube(nodeData, nodeInput, credentials, signal);
+      case 'SlackNode':
+        return this._execSlack(nodeData, nodeInput, credentials, signal);
+      case 'TelegramNode':
+        return this._execTelegram(nodeData, nodeInput, credentials, signal);
+      case 'AirtableNode':
+        return this._execAirtable(nodeData, nodeInput, credentials, signal);
+
       default:
         throw new Error(`Unknown node type: ${nodeType}`);
     }
@@ -1527,6 +1541,31 @@ ${htmlContent}
   }
 
   _execSplit(nodeData, nodeInput) {
+    const splitBy = nodeData.splitBy || 'items';
+    const splitCount = nodeData.splitCount || 2;
+
+    if (splitBy === 'lines') {
+      const lines = String(nodeInput).split('\n');
+      // Chunk lines into splitCount groups
+      const chunkSize = Math.ceil(lines.length / splitCount);
+      const chunks = [];
+      for (let i = 0; i < lines.length; i += chunkSize) {
+        chunks.push(lines.slice(i, i + chunkSize).join('\n'));
+      }
+      return chunks;
+    }
+
+    if (splitBy === 'chunks') {
+      const text = String(nodeInput);
+      const chunkSize = Math.ceil(text.length / splitCount);
+      const chunks = [];
+      for (let i = 0; i < text.length; i += chunkSize) {
+        chunks.push(text.slice(i, i + chunkSize));
+      }
+      return chunks;
+    }
+
+    // Default: 'items' — split an array
     let items;
     try {
       items = typeof nodeInput === 'string' ? JSON.parse(nodeInput) : nodeInput;
@@ -1534,25 +1573,64 @@ ${htmlContent}
       items = String(nodeInput).split('\n');
     }
     if (!Array.isArray(items)) items = [items];
-    return items;
+
+    // Chunk array into splitCount groups
+    const chunkSize = Math.ceil(items.length / splitCount);
+    const chunks = [];
+    for (let i = 0; i < items.length; i += chunkSize) {
+      chunks.push(items.slice(i, i + chunkSize));
+    }
+    return chunks.length === 1 ? chunks[0] : chunks;
   }
 
   _execMerge(nodeData, nodeInput) {
-    if (!Array.isArray(nodeInput)) return nodeInput;
     const mode = nodeData.mergeMode || 'append';
+
+    // Try to parse input as array(s) for zip/merge operations
+    let items;
+    if (Array.isArray(nodeInput)) {
+      items = nodeInput;
+    } else if (typeof nodeInput === 'string') {
+      try {
+        const parsed = JSON.parse(nodeInput);
+        items = Array.isArray(parsed) ? parsed : [parsed];
+      } catch {
+        // Split by double-newline (how resolveNodeInput joins multiple upstream outputs)
+        items = nodeInput.split('\n\n').filter(Boolean);
+      }
+    } else {
+      items = [nodeInput];
+    }
+
     switch (mode) {
-      case 'zip':
-        return nodeInput;
-      case 'merge':
-        if (nodeInput.every((i) => typeof i === 'object' && i !== null)) {
-          return Object.assign({}, ...nodeInput);
+      case 'zip': {
+        // Pair elements from upstream arrays: [[a1,b1], [a2,b2], ...]
+        const arrays = items.map((item) => {
+          if (Array.isArray(item)) return item;
+          try {
+            const parsed = JSON.parse(item);
+            return Array.isArray(parsed) ? parsed : [parsed];
+          } catch {
+            return [item];
+          }
+        });
+        const maxLen = Math.max(...arrays.map((a) => a.length));
+        const zipped = [];
+        for (let i = 0; i < maxLen; i++) {
+          zipped.push(arrays.map((a) => a[i] ?? null));
         }
-        return nodeInput.join('\n');
+        return JSON.stringify(zipped, null, 2);
+      }
+      case 'merge':
+        if (items.every((i) => typeof i === 'object' && i !== null && !Array.isArray(i))) {
+          return JSON.stringify(Object.assign({}, ...items), null, 2);
+        }
+        return items.map((i) => typeof i === 'string' ? i : JSON.stringify(i)).join('\n');
       case 'first':
-        return nodeInput.find((i) => i != null && i !== '') ?? '';
+        return items.find((i) => i != null && i !== '') ?? '';
       case 'append':
       default:
-        return nodeInput.map((i) => typeof i === 'string' ? i : JSON.stringify(i)).join('\n');
+        return items.map((i) => typeof i === 'string' ? i : JSON.stringify(i)).join('\n');
     }
   }
 
@@ -1605,8 +1683,20 @@ ${htmlContent}
 
   async _execSentiment(nodeData, nodeInput, credentials, settings) {
     const gran = nodeData.granularity || 'document';
+    const outputFormat = nodeData.outputFormat || 'json';
     const prompt = `You are a sentiment analyzer. Analyze the sentiment of the following text at the ${gran} level.\n\nRespond with ONLY a JSON object: {"sentiment": "positive|negative|neutral|mixed", "score": <-1.0 to 1.0>, "confidence": <0.0 to 1.0>}. No other text.`;
-    return this._execAIProcessing(prompt, nodeInput, credentials, settings);
+    const raw = await this._execAIProcessing(prompt, nodeInput, credentials, settings);
+
+    // Post-process based on outputFormat
+    if (outputFormat === 'json') return raw;
+    try {
+      const parsed = JSON.parse(raw);
+      if (outputFormat === 'label') return parsed.sentiment || raw;
+      if (outputFormat === 'score') return String(parsed.score ?? raw);
+    } catch {
+      // If parsing fails, return raw
+    }
+    return raw;
   }
 
   async _execInfoExtractor(nodeData, nodeInput, credentials, settings) {
@@ -1624,8 +1714,16 @@ ${htmlContent}
 
   async _execQAChain(nodeData, nodeInput, credentials, settings) {
     const style = nodeData.responseStyle || 'detailed';
+    const contextSource = nodeData.contextSource || 'upstream';
+
+    let contextText = nodeInput;
+    if (contextSource === 'manual' && nodeData.manualContext) {
+      // Prepend manual context, use upstream input as the question
+      contextText = `Context:\n${nodeData.manualContext}\n\nQuestion:\n${nodeInput}`;
+    }
+
     const prompt = `You are a Q&A assistant. The user has provided context and a question. Answer based ONLY on the provided context. Give a ${style} response. If the answer is not in the context, say "I don't have enough information to answer that."`;
-    return this._execAIProcessing(prompt, nodeInput, credentials, settings);
+    return this._execAIProcessing(prompt, contextText, credentials, settings);
   }
 
   // =========================================================================
@@ -1805,6 +1903,285 @@ ${htmlContent}
       return `# ${data.title}\n\n${stripped.slice(0, 5000)}`;
     } catch (err) {
       return `Wikipedia lookup failed: ${err.message}`;
+    }
+  }
+  /* ════════════════════════════════════════════════════════
+     v0.7.0 — Integration Node Executors
+     ════════════════════════════════════════════════════════ */
+
+  _templateReplace(template, input) {
+    return (template || '').replace(/\{\{input\}\}/g, typeof input === 'string' ? input : JSON.stringify(input));
+  }
+
+  async _execGmail(data, input, credentials, signal) {
+    const apiKey = credentials?.['google-api-key'];
+    if (!apiKey) return 'Error: Google API key not configured. Add it in Settings.';
+    const op = data.operation || 'send';
+    try {
+      if (op === 'send') {
+        const to = data.to || '';
+        const subject = data.subject || '';
+        const body = this._templateReplace(data.bodyTemplate, input);
+        const raw = btoa(
+          `To: ${to}\r\nSubject: ${subject}\r\nContent-Type: text/plain; charset=UTF-8\r\n\r\n${body}`
+        ).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        const res = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ raw }),
+          signal,
+        });
+        const json = await res.json();
+        return res.ok ? `Email sent (ID: ${json.id})` : `Gmail error: ${json.error?.message || JSON.stringify(json)}`;
+      } else if (op === 'read') {
+        const label = data.labelFilter || 'INBOX';
+        const max = data.maxResults || 10;
+        const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?labelIds=${encodeURIComponent(label)}&maxResults=${max}`, {
+          headers: { 'Authorization': `Bearer ${apiKey}` }, signal,
+        });
+        const json = await res.json();
+        return JSON.stringify(json.messages || [], null, 2);
+      } else if (op === 'search') {
+        const q = data.searchQuery || input;
+        const max = data.maxResults || 10;
+        const res = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages?q=${encodeURIComponent(q)}&maxResults=${max}`, {
+          headers: { 'Authorization': `Bearer ${apiKey}` }, signal,
+        });
+        const json = await res.json();
+        return JSON.stringify(json.messages || [], null, 2);
+      }
+      return input;
+    } catch (err) {
+      return `Gmail error: ${err.message}`;
+    }
+  }
+
+  async _execGoogleSheets(data, input, credentials, signal) {
+    const apiKey = credentials?.['google-api-key'];
+    if (!apiKey) return 'Error: Google API key not configured. Add it in Settings.';
+    const id = data.spreadsheetId;
+    const sheet = data.sheetName || 'Sheet1';
+    const range = data.range || 'A1:Z100';
+    const fullRange = `${sheet}!${range}`;
+    const base = `https://sheets.googleapis.com/v4/spreadsheets/${id}`;
+    try {
+      const op = data.operation || 'read';
+      if (op === 'read') {
+        const res = await fetch(`${base}/values/${encodeURIComponent(fullRange)}?key=${apiKey}`, { signal });
+        const json = await res.json();
+        return JSON.stringify(json.values || [], null, 2);
+      } else if (op === 'write') {
+        let values;
+        try { values = JSON.parse(data.rowData || input); } catch { values = [[data.rowData || input]]; }
+        if (!Array.isArray(values[0])) values = [values];
+        const res = await fetch(`${base}/values/${encodeURIComponent(fullRange)}?valueInputOption=USER_ENTERED&key=${apiKey}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify({ values }),
+          signal,
+        });
+        const json = await res.json();
+        return res.ok ? `Written ${json.updatedCells || 0} cells` : `Sheets error: ${json.error?.message || JSON.stringify(json)}`;
+      } else if (op === 'append') {
+        let values;
+        try { values = JSON.parse(data.rowData || input); } catch { values = [[data.rowData || input]]; }
+        if (!Array.isArray(values[0])) values = [values];
+        const res = await fetch(`${base}/values/${encodeURIComponent(fullRange)}:append?valueInputOption=USER_ENTERED&insertDataOption=INSERT_ROWS`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify({ values }),
+          signal,
+        });
+        const json = await res.json();
+        return res.ok ? `Appended ${json.updates?.updatedRows || 0} rows` : `Sheets error: ${json.error?.message || JSON.stringify(json)}`;
+      } else if (op === 'update') {
+        let values;
+        try { values = JSON.parse(data.rowData || input); } catch { values = [[data.rowData || input]]; }
+        if (!Array.isArray(values[0])) values = [values];
+        const res = await fetch(`${base}/values/${encodeURIComponent(fullRange)}?valueInputOption=USER_ENTERED`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+          body: JSON.stringify({ values }),
+          signal,
+        });
+        const json = await res.json();
+        return res.ok ? `Updated ${json.updatedCells || 0} cells` : `Sheets error: ${json.error?.message || JSON.stringify(json)}`;
+      }
+      return input;
+    } catch (err) {
+      return `Google Sheets error: ${err.message}`;
+    }
+  }
+
+  async _execYouTube(data, input, credentials, signal) {
+    const apiKey = credentials?.['google-api-key'];
+    if (!apiKey) return 'Error: Google API key not configured. Add it in Settings.';
+    const base = 'https://www.googleapis.com/youtube/v3';
+    try {
+      const op = data.operation || 'search';
+      if (op === 'search') {
+        const q = data.query || input;
+        const max = data.maxResults || 5;
+        const res = await fetch(`${base}/search?part=snippet&type=video&q=${encodeURIComponent(q)}&maxResults=${max}&key=${apiKey}`, { signal });
+        const json = await res.json();
+        if (!res.ok) return `YouTube error: ${json.error?.message || JSON.stringify(json)}`;
+        return (json.items || []).map((v) => `${v.snippet.title} (https://youtu.be/${v.id.videoId})`).join('\n');
+      } else if (op === 'info') {
+        const vid = data.videoId || input;
+        const res = await fetch(`${base}/videos?part=snippet,statistics,contentDetails&id=${encodeURIComponent(vid)}&key=${apiKey}`, { signal });
+        const json = await res.json();
+        if (!res.ok) return `YouTube error: ${json.error?.message || JSON.stringify(json)}`;
+        const item = json.items?.[0];
+        if (!item) return 'Video not found.';
+        return JSON.stringify({ title: item.snippet.title, description: item.snippet.description, views: item.statistics.viewCount, likes: item.statistics.likeCount, duration: item.contentDetails.duration }, null, 2);
+      } else if (op === 'captions') {
+        const vid = data.videoId || input;
+        const lang = data.captionLanguage || 'en';
+        const res = await fetch(`${base}/captions?part=snippet&videoId=${encodeURIComponent(vid)}&key=${apiKey}`, { signal });
+        const json = await res.json();
+        if (!res.ok) return `YouTube error: ${json.error?.message || JSON.stringify(json)}`;
+        const captions = (json.items || []).filter((c) => c.snippet.language === lang);
+        return captions.length > 0
+          ? `Found ${captions.length} caption track(s) for "${lang}": ${captions.map((c) => c.snippet.name || c.id).join(', ')}`
+          : `No captions found for language "${lang}". Available: ${(json.items || []).map((c) => c.snippet.language).join(', ')}`;
+      }
+      return input;
+    } catch (err) {
+      return `YouTube error: ${err.message}`;
+    }
+  }
+
+  async _execSlack(data, input, credentials, signal) {
+    const token = credentials?.['slack-bot-token'];
+    if (!token) return 'Error: Slack Bot Token not configured. Add it in Settings.';
+    const headers = { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' };
+    try {
+      const op = data.operation || 'send';
+      if (op === 'send') {
+        const channel = data.channel || '';
+        const text = this._templateReplace(data.messageTemplate, input);
+        const res = await fetch('https://slack.com/api/chat.postMessage', {
+          method: 'POST', headers, body: JSON.stringify({ channel, text }), signal,
+        });
+        const json = await res.json();
+        return json.ok ? `Message sent to ${channel} (ts: ${json.ts})` : `Slack error: ${json.error}`;
+      } else if (op === 'read') {
+        const channel = data.channel || '';
+        const limit = data.maxResults || 20;
+        const res = await fetch(`https://slack.com/api/conversations.history?channel=${encodeURIComponent(channel)}&limit=${limit}`, {
+          headers, signal,
+        });
+        const json = await res.json();
+        if (!json.ok) return `Slack error: ${json.error}`;
+        return (json.messages || []).map((m) => `[${m.user}] ${m.text}`).join('\n');
+      } else if (op === 'channels') {
+        const res = await fetch('https://slack.com/api/conversations.list?types=public_channel,private_channel&limit=100', {
+          headers, signal,
+        });
+        const json = await res.json();
+        if (!json.ok) return `Slack error: ${json.error}`;
+        return (json.channels || []).map((c) => `#${c.name} (${c.id})`).join('\n');
+      }
+      return input;
+    } catch (err) {
+      return `Slack error: ${err.message}`;
+    }
+  }
+
+  async _execTelegram(data, input, credentials, signal) {
+    const token = credentials?.['telegram-bot-token'];
+    if (!token) return 'Error: Telegram Bot Token not configured. Add it in Settings.';
+    const base = `https://api.telegram.org/bot${token}`;
+    try {
+      const op = data.operation || 'send_message';
+      if (op === 'send_message') {
+        const chatId = data.chatId || '';
+        const text = this._templateReplace(data.messageTemplate, input);
+        const res = await fetch(`${base}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, text, parse_mode: 'HTML' }),
+          signal,
+        });
+        const json = await res.json();
+        return json.ok ? `Message sent (message_id: ${json.result.message_id})` : `Telegram error: ${json.description}`;
+      } else if (op === 'send_photo') {
+        const chatId = data.chatId || '';
+        const photo = data.photoUrl || input;
+        const caption = data.messageTemplate || '';
+        const res = await fetch(`${base}/sendPhoto`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ chat_id: chatId, photo, caption }),
+          signal,
+        });
+        const json = await res.json();
+        return json.ok ? `Photo sent (message_id: ${json.result.message_id})` : `Telegram error: ${json.description}`;
+      } else if (op === 'get_updates') {
+        const res = await fetch(`${base}/getUpdates?limit=20`, { signal });
+        const json = await res.json();
+        if (!json.ok) return `Telegram error: ${json.description}`;
+        return (json.result || []).map((u) => {
+          const msg = u.message;
+          return msg ? `[${msg.from?.first_name || 'Unknown'}] ${msg.text || '(media)'}` : JSON.stringify(u);
+        }).join('\n');
+      }
+      return input;
+    } catch (err) {
+      return `Telegram error: ${err.message}`;
+    }
+  }
+
+  async _execAirtable(data, input, credentials, signal) {
+    const apiKey = credentials?.['airtable-api-key'];
+    if (!apiKey) return 'Error: Airtable API Key not configured. Add it in Settings.';
+    const baseId = data.baseId || '';
+    const table = encodeURIComponent(data.tableName || '');
+    const base = `https://api.airtable.com/v0/${baseId}/${table}`;
+    const headers = { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' };
+    try {
+      const op = data.operation || 'list';
+      if (op === 'list') {
+        const filter = data.filterFormula ? `?filterByFormula=${encodeURIComponent(data.filterFormula)}` : '';
+        const res = await fetch(`${base}${filter}`, { headers, signal });
+        const json = await res.json();
+        if (json.error) return `Airtable error: ${json.error.message || JSON.stringify(json.error)}`;
+        return JSON.stringify((json.records || []).map((r) => ({ id: r.id, ...r.fields })), null, 2);
+      } else if (op === 'create') {
+        let fields;
+        try { fields = JSON.parse(data.fields || input); } catch { fields = { Note: data.fields || input }; }
+        const res = await fetch(base, {
+          method: 'POST', headers,
+          body: JSON.stringify({ records: [{ fields }] }),
+          signal,
+        });
+        const json = await res.json();
+        if (json.error) return `Airtable error: ${json.error.message || JSON.stringify(json.error)}`;
+        return `Created record: ${json.records?.[0]?.id || 'unknown'}`;
+      } else if (op === 'update') {
+        const recordId = data.recordId || '';
+        let fields;
+        try { fields = JSON.parse(data.fields || input); } catch { fields = { Note: data.fields || input }; }
+        const res = await fetch(`${base}/${recordId}`, {
+          method: 'PATCH', headers,
+          body: JSON.stringify({ fields }),
+          signal,
+        });
+        const json = await res.json();
+        if (json.error) return `Airtable error: ${json.error.message || JSON.stringify(json.error)}`;
+        return `Updated record: ${json.id}`;
+      } else if (op === 'delete') {
+        const recordId = data.recordId || '';
+        const res = await fetch(`${base}/${recordId}`, {
+          method: 'DELETE', headers, signal,
+        });
+        const json = await res.json();
+        if (json.error) return `Airtable error: ${json.error.message || JSON.stringify(json.error)}`;
+        return `Deleted record: ${json.id}`;
+      }
+      return input;
+    } catch (err) {
+      return `Airtable error: ${err.message}`;
     }
   }
 }

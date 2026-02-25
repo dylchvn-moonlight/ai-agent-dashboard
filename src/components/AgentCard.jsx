@@ -1,6 +1,7 @@
-import React from 'react';
-import { Play, DollarSign, Clock } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Play, DollarSign, Clock, MoreVertical, ExternalLink, Trash2 } from 'lucide-react';
 import useUiStore from '@/stores/ui-store';
+import useAgentStore from '@/stores/agent-store';
 import { truncate } from '@/lib/utils';
 
 const STATUS_STYLES = {
@@ -13,11 +14,29 @@ const STATUS_STYLES = {
 
 export default function AgentCard({ agent }) {
   const goToAgent = useUiStore((s) => s.goToAgent);
+  const deleteAgent = useAgentStore((s) => s.deleteAgent);
   const status = STATUS_STYLES[agent.status] || STATUS_STYLES.draft;
+
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const menuRef = useRef(null);
 
   const executions = agent.metrics?.totalRuns ?? agent.metrics?.totalExecutions ?? 0;
   const cost = agent.metrics?.totalCost ?? 0;
   const latency = agent.metrics?.avgLatency ?? 0;
+
+  // Close menu on click outside
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handler = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpen(false);
+        setConfirmDelete(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [menuOpen]);
 
   return (
     <button
@@ -29,6 +48,60 @@ export default function AgentCard({ agent }) {
         className="absolute left-0 top-0 bottom-0 w-1 rounded-l-xl"
         style={{ backgroundColor: agent.color || '#3B82F6' }}
       />
+
+      {/* Three-dot menu */}
+      <div className="absolute top-2 right-2 z-10" ref={menuRef}>
+        <div
+          role="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setMenuOpen(!menuOpen);
+            setConfirmDelete(false);
+          }}
+          className="p-1 rounded-md opacity-0 group-hover:opacity-100 hover:bg-white/10 text-[var(--dm)] hover:text-[var(--tx)] transition-all cursor-pointer"
+        >
+          <MoreVertical size={14} />
+        </div>
+
+        {menuOpen && (
+          <div
+            className="absolute right-0 top-full mt-1 w-36 bg-[var(--sf)] border border-[var(--glassBd)] rounded-lg shadow-xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              role="button"
+              onClick={() => {
+                setMenuOpen(false);
+                goToAgent(agent.id);
+              }}
+              className="flex items-center gap-2 w-full px-3 py-2 text-xs text-[var(--tx)] hover:bg-white/5 transition-colors cursor-pointer"
+            >
+              <ExternalLink size={12} /> Open
+            </div>
+            {confirmDelete ? (
+              <div
+                role="button"
+                onClick={() => {
+                  deleteAgent(agent.id);
+                  setMenuOpen(false);
+                  setConfirmDelete(false);
+                }}
+                className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors cursor-pointer"
+              >
+                <Trash2 size={12} /> Confirm Delete
+              </div>
+            ) : (
+              <div
+                role="button"
+                onClick={() => setConfirmDelete(true)}
+                className="flex items-center gap-2 w-full px-3 py-2 text-xs text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+              >
+                <Trash2 size={12} /> Delete
+              </div>
+            )}
+          </div>
+        )}
+      </div>
 
       {/* Card content */}
       <div className="flex flex-col gap-3 p-4 pl-5">

@@ -36,6 +36,8 @@ export default function AgentBuilder() {
   const isRunning = useExecutionStore((s) => s.isRunning);
   const activeExecutionId = useExecutionStore((s) => s.activeExecutionId);
   const startExecution = useExecutionStore((s) => s.startExecution);
+  const completeExecution = useExecutionStore((s) => s.completeExecution);
+  const failExecution = useExecutionStore((s) => s.failExecution);
 
   const createAgentFromStore = useAgentStore((s) => s.createAgent);
   const goToAgent = useUiStore((s) => s.goToAgent);
@@ -142,16 +144,19 @@ export default function AgentBuilder() {
     try {
       const result = await window.electronAPI?.executeAgent(agentWithFlow, runInput, execution.id);
       if (result?.success) {
+        completeExecution(execution.id, result);
         toast.success('Agent execution completed');
       } else {
+        failExecution(execution.id, result?.error || 'Execution failed');
         toast.error(result?.error || 'Execution failed');
       }
     } catch (err) {
       console.error('Agent execution failed:', err);
+      failExecution(execution.id, err);
       toast.error('Execution failed: ' + (err.message || 'Unknown error'));
     }
     setRunInput('');
-  }, [agent, isRunning, runInput, startExecution, updateAgent]);
+  }, [agent, isRunning, runInput, startExecution, completeExecution, failExecution, updateAgent]);
 
   /* Handle selecting a template */
   const handleSelectTemplate = useCallback((template) => {

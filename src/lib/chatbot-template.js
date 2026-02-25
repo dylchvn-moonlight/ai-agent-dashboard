@@ -88,8 +88,8 @@ export function configToAgentFlow(config) {
       position: { x: 600, y: 200 },
       data: {
         label: `${config.businessName || 'Chatbot'} AI`,
-        provider: 'claude',
-        model: 'claude-sonnet-4-6',
+        provider: config.provider || 'claude',
+        model: config.model || 'claude-sonnet-4-6',
         systemPrompt,
         temperature: 0.5,
         maxTokens: 1024,

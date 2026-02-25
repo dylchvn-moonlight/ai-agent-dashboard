@@ -318,4 +318,84 @@ export const AGENT_TEMPLATES = [
       ],
     },
   },
+
+  {
+    name: 'YouTube AI Agent Scout',
+    description: 'Search YouTube for trending AI videos from the last 24 hours, rank the top 5, and generate an HTML report.',
+    icon: '\uD83C\uDFAC',
+    color: '#ef4444',
+    config: {
+      provider: 'claude',
+      model: 'claude-sonnet-4-6',
+      temperature: 0.5,
+      maxTokens: 4096,
+    },
+    flow: {
+      nodes: [
+        {
+          id: 'yt-input-1',
+          type: 'InputNode',
+          position: { x: 50, y: 200 },
+          data: {
+            label: 'Search Query',
+            inputType: 'text',
+            description: 'Enter an AI topic to scout (e.g. "AI agents", "LLM news")',
+          },
+        },
+        {
+          id: 'yt-scraper-1',
+          type: 'ScraperNode',
+          position: { x: 300, y: 200 },
+          data: {
+            label: 'YouTube Search (24h)',
+            url: 'https://www.youtube.com/results?search_query={{input}}&sp=EgIIAQ%253D%253D',
+            selector: '#contents ytd-video-renderer',
+            format: 'text',
+          },
+        },
+        {
+          id: 'yt-llm-1',
+          type: 'LLMNode',
+          position: { x: 550, y: 200 },
+          data: {
+            label: 'Parse & Rank Top 5',
+            provider: 'claude',
+            model: 'claude-sonnet-4-6',
+            systemPrompt:
+              'You are a YouTube content analyst specializing in AI topics. ' +
+              'From the provided YouTube search results, identify the top 5 most relevant and trending videos. ' +
+              'For each video, extract: title, channel name, view count, upload time, and video URL. ' +
+              'Rank them by relevance and engagement. ' +
+              'Output as a structured list with brief analysis of why each video is noteworthy.',
+            temperature: 0.5,
+            maxTokens: 4096,
+          },
+        },
+        {
+          id: 'yt-blog-1',
+          type: 'BlogNode',
+          position: { x: 800, y: 200 },
+          data: {
+            label: 'Format Report',
+            filenameTemplate: 'youtube-ai-scout-{{date}}',
+            cssTheme: 'modern',
+            pageTitle: 'YouTube AI Scout Report',
+            includeTableOfContents: false,
+          },
+        },
+        {
+          id: 'yt-output-1',
+          type: 'OutputNode',
+          position: { x: 1050, y: 200 },
+          data: { label: 'Scout Report', outputFormat: 'text' },
+        },
+      ],
+      edges: [
+        { id: 'e-yt-input-scraper', source: 'yt-input-1', target: 'yt-scraper-1', type: 'smoothstep', animated: true },
+        { id: 'e-yt-scraper-llm', source: 'yt-scraper-1', target: 'yt-llm-1', type: 'smoothstep', animated: true },
+        { id: 'e-yt-llm-blog', source: 'yt-llm-1', target: 'yt-blog-1', type: 'smoothstep', animated: true },
+        { id: 'e-yt-blog-output', source: 'yt-blog-1', target: 'yt-output-1', type: 'smoothstep', animated: true },
+      ],
+    },
+  },
 ];

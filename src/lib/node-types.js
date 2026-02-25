@@ -1,7 +1,12 @@
 import {
   MessageSquare, Brain, Wrench, Globe, GitBranch, Repeat,
   Database, Send, Code, Wifi, Route, Shuffle, Bot,
-  Mail, FileText, FileType, Globe2, Video
+  Mail, FileText, FileType, Globe2, Video,
+  // v0.4.2 icons
+  ArrowLeftRight, Filter, Split, Merge, Clock,
+  Tags, Smile, FileSearch, AlignLeft, MessageCircleQuestion,
+  Timer, Webhook, MessageSquarePlus,
+  ArrowUpDown, Sigma, ListFilter, Calculator, Search, BookOpen,
 } from 'lucide-react';
 
 export const NODE_CATEGORIES = {
@@ -15,20 +20,30 @@ export const NODE_CATEGORIES = {
     colorClass: 'node-ai',
     nodes: ['LLMNode', 'MemoryNode'],
   },
+  'AI Processing': {
+    color: 'var(--node-aiproc)',
+    colorClass: 'node-aiproc',
+    nodes: ['TextClassifierNode', 'SentimentNode', 'InfoExtractorNode', 'SummarizerNode', 'QAChainNode'],
+  },
+  'Triggers': {
+    color: 'var(--node-trigger)',
+    colorClass: 'node-trigger',
+    nodes: ['ScheduleTriggerNode', 'WebhookTriggerNode', 'ChatTriggerNode'],
+  },
   'Tools': {
     color: 'var(--node-tool)',
     colorClass: 'node-tool',
-    nodes: ['ToolNode', 'ScraperNode', 'HTTPNode', 'CodeNode'],
+    nodes: ['ToolNode', 'ScraperNode', 'HTTPNode', 'CodeNode', 'CalculatorNode', 'SearchNode', 'WikipediaNode'],
   },
   'Control Flow': {
     color: 'var(--node-flow)',
     colorClass: 'node-flow',
-    nodes: ['ConditionNode', 'LoopNode', 'RouterNode'],
+    nodes: ['ConditionNode', 'LoopNode', 'RouterNode', 'SwitchNode', 'FilterNode', 'SplitNode', 'MergeNode', 'WaitNode'],
   },
   'Data': {
     color: 'var(--node-data)',
     colorClass: 'node-data',
-    nodes: ['TransformNode', 'SubAgentNode'],
+    nodes: ['TransformNode', 'SubAgentNode', 'SortNode', 'AggregateNode', 'DeduplicateNode'],
   },
   'Actions': {
     color: 'var(--node-action)',
@@ -277,6 +292,241 @@ export const NODE_DEFINITIONS = {
       fps: 30,
       resolution: '1920x1080',
       codec: 'libx264',
+    },
+  },
+
+  /* ─── v0.4.2 — Flow Control ─── */
+  SwitchNode: {
+    label: 'Switch',
+    icon: ArrowLeftRight,
+    category: 'Control Flow',
+    color: 'var(--node-flow)',
+    description: 'Multi-way branching by value',
+    defaultData: {
+      label: 'Switch',
+      switchField: 'value',
+      cases: [
+        { label: 'Case 1', value: '' },
+        { label: 'Default', value: '*' },
+      ],
+    },
+  },
+  FilterNode: {
+    label: 'Filter',
+    icon: Filter,
+    category: 'Control Flow',
+    color: 'var(--node-flow)',
+    description: 'Filter arrays/objects by condition',
+    defaultData: {
+      label: 'Filter',
+      filterExpression: '',
+      filterMode: 'include',
+    },
+  },
+  SplitNode: {
+    label: 'Split',
+    icon: Split,
+    category: 'Control Flow',
+    color: 'var(--node-flow)',
+    description: 'Split input into parallel streams',
+    defaultData: {
+      label: 'Split',
+      splitCount: 2,
+      splitBy: 'items',
+    },
+  },
+  MergeNode: {
+    label: 'Merge',
+    icon: Merge,
+    category: 'Control Flow',
+    color: 'var(--node-flow)',
+    description: 'Combine multiple inputs into one',
+    defaultData: {
+      label: 'Merge',
+      mergeMode: 'append',
+    },
+  },
+  WaitNode: {
+    label: 'Wait',
+    icon: Clock,
+    category: 'Control Flow',
+    color: 'var(--node-flow)',
+    description: 'Pause execution for a duration',
+    defaultData: {
+      label: 'Wait',
+      waitDuration: 1,
+      waitUnit: 'seconds',
+    },
+  },
+
+  /* ─── v0.4.2 — AI Processing ─── */
+  TextClassifierNode: {
+    label: 'Text Classifier',
+    icon: Tags,
+    category: 'AI Processing',
+    color: 'var(--node-aiproc)',
+    description: 'Classify text into categories via LLM',
+    defaultData: {
+      label: 'Text Classifier',
+      categories: ['positive', 'negative', 'neutral'],
+      multiLabel: false,
+    },
+  },
+  SentimentNode: {
+    label: 'Sentiment',
+    icon: Smile,
+    category: 'AI Processing',
+    color: 'var(--node-aiproc)',
+    description: 'Analyze sentiment of text via LLM',
+    defaultData: {
+      label: 'Sentiment Analysis',
+      outputFormat: 'json',
+      granularity: 'document',
+    },
+  },
+  InfoExtractorNode: {
+    label: 'Info Extractor',
+    icon: FileSearch,
+    category: 'AI Processing',
+    color: 'var(--node-aiproc)',
+    description: 'Extract structured data from text via LLM',
+    defaultData: {
+      label: 'Info Extractor',
+      extractionFields: ['name', 'email', 'phone'],
+    },
+  },
+  SummarizerNode: {
+    label: 'Summarizer',
+    icon: AlignLeft,
+    category: 'AI Processing',
+    color: 'var(--node-aiproc)',
+    description: 'Summarize long content via LLM',
+    defaultData: {
+      label: 'Summarizer',
+      maxLength: 200,
+      summaryStyle: 'concise',
+    },
+  },
+  QAChainNode: {
+    label: 'Q&A Chain',
+    icon: MessageCircleQuestion,
+    category: 'AI Processing',
+    color: 'var(--node-aiproc)',
+    description: 'Answer questions over provided context',
+    defaultData: {
+      label: 'Q&A Chain',
+      contextSource: 'upstream',
+      responseStyle: 'detailed',
+    },
+  },
+
+  /* ─── v0.4.2 — Triggers ─── */
+  ScheduleTriggerNode: {
+    label: 'Schedule',
+    icon: Timer,
+    category: 'Triggers',
+    color: 'var(--node-trigger)',
+    description: 'Trigger on a cron schedule',
+    defaultData: {
+      label: 'Schedule Trigger',
+      cronExpression: '0 * * * *',
+      timezone: 'UTC',
+    },
+  },
+  WebhookTriggerNode: {
+    label: 'Webhook',
+    icon: Webhook,
+    category: 'Triggers',
+    color: 'var(--node-trigger)',
+    description: 'Trigger via HTTP webhook',
+    defaultData: {
+      label: 'Webhook Trigger',
+      webhookMethod: 'POST',
+      webhookPath: 'webhook',
+    },
+  },
+  ChatTriggerNode: {
+    label: 'Chat',
+    icon: MessageSquarePlus,
+    category: 'Triggers',
+    color: 'var(--node-trigger)',
+    description: 'Trigger from a chat message',
+    defaultData: {
+      label: 'Chat Trigger',
+    },
+  },
+
+  /* ─── v0.4.2 — Data (Sort, Aggregate, Deduplicate) ─── */
+  SortNode: {
+    label: 'Sort',
+    icon: ArrowUpDown,
+    category: 'Data',
+    color: 'var(--node-data)',
+    description: 'Sort arrays by field',
+    defaultData: {
+      label: 'Sort',
+      sortField: 'value',
+      sortOrder: 'asc',
+    },
+  },
+  AggregateNode: {
+    label: 'Aggregate',
+    icon: Sigma,
+    category: 'Data',
+    color: 'var(--node-data)',
+    description: 'Aggregate/reduce data',
+    defaultData: {
+      label: 'Aggregate',
+      aggregateOp: 'concatenate',
+      aggregateField: '',
+    },
+  },
+  DeduplicateNode: {
+    label: 'Deduplicate',
+    icon: ListFilter,
+    category: 'Data',
+    color: 'var(--node-data)',
+    description: 'Remove duplicate items',
+    defaultData: {
+      label: 'Deduplicate',
+      deduplicateField: 'auto',
+    },
+  },
+
+  /* ─── v0.4.2 — Tools (Calculator, Search, Wikipedia) ─── */
+  CalculatorNode: {
+    label: 'Calculator',
+    icon: Calculator,
+    category: 'Tools',
+    color: 'var(--node-tool)',
+    description: 'Evaluate math expressions',
+    defaultData: {
+      label: 'Calculator',
+      expression: '',
+    },
+  },
+  SearchNode: {
+    label: 'Search',
+    icon: Search,
+    category: 'Tools',
+    color: 'var(--node-tool)',
+    description: 'Web search via SerpApi',
+    defaultData: {
+      label: 'Web Search',
+      searchEngine: 'SerpApi',
+      maxResults: 5,
+    },
+  },
+  WikipediaNode: {
+    label: 'Wikipedia',
+    icon: BookOpen,
+    category: 'Tools',
+    color: 'var(--node-tool)',
+    description: 'Look up Wikipedia articles',
+    defaultData: {
+      label: 'Wikipedia',
+      language: 'en',
+      sections: 'summary',
     },
   },
 };

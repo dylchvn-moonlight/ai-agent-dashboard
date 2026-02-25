@@ -31,6 +31,8 @@
   --node-flow: #F59E0B;
   --node-data: #06B6D4;
   --node-action: #F43F5E;
+  --node-aiproc: #E879F9;
+  --node-trigger: #FB923C;
 
   /* Glow */
   --glow: 0 0 0 transparent;

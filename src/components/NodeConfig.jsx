@@ -84,6 +84,29 @@ export default function NodeConfig({ node }) {
         {node.type === 'DocxNode' && <DocxFields data={node.data} update={update} />}
         {node.type === 'BlogNode' && <BlogFields data={node.data} update={update} />}
         {node.type === 'VideoNode' && <VideoFields data={node.data} update={update} />}
+        {/* v0.4.2 — Flow Control */}
+        {node.type === 'SwitchNode' && <SwitchFields data={node.data} update={update} />}
+        {node.type === 'FilterNode' && <FilterFields data={node.data} update={update} />}
+        {node.type === 'SplitNode' && <SplitFields data={node.data} update={update} />}
+        {node.type === 'MergeNode' && <MergeFields data={node.data} update={update} />}
+        {node.type === 'WaitNode' && <WaitFields data={node.data} update={update} />}
+        {/* v0.4.2 — AI Processing */}
+        {node.type === 'TextClassifierNode' && <TextClassifierFields data={node.data} update={update} />}
+        {node.type === 'SentimentNode' && <SentimentFields data={node.data} update={update} />}
+        {node.type === 'InfoExtractorNode' && <InfoExtractorFields data={node.data} update={update} />}
+        {node.type === 'SummarizerNode' && <SummarizerFields data={node.data} update={update} />}
+        {node.type === 'QAChainNode' && <QAChainFields data={node.data} update={update} />}
+        {/* v0.4.2 — Triggers */}
+        {node.type === 'ScheduleTriggerNode' && <ScheduleTriggerFields data={node.data} update={update} />}
+        {node.type === 'WebhookTriggerNode' && <WebhookTriggerFields data={node.data} update={update} />}
+        {node.type === 'ChatTriggerNode' && <ChatTriggerFields data={node.data} update={update} />}
+        {/* v0.4.2 — Data & Tools */}
+        {node.type === 'SortNode' && <SortFields data={node.data} update={update} />}
+        {node.type === 'AggregateNode' && <AggregateFields data={node.data} update={update} />}
+        {node.type === 'DeduplicateNode' && <DeduplicateFields data={node.data} update={update} />}
+        {node.type === 'CalculatorNode' && <CalculatorFields data={node.data} update={update} />}
+        {node.type === 'SearchNode' && <SearchFields data={node.data} update={update} />}
+        {node.type === 'WikipediaNode' && <WikipediaFields data={node.data} update={update} />}
       </div>
     </div>
   );
@@ -774,6 +797,441 @@ function VideoFields({ data, update }) {
             { value: 'libx264', label: 'H.264 (libx264)' },
             { value: 'libx265', label: 'H.265 (libx265)' },
             { value: 'libvpx-vp9', label: 'VP9 (libvpx-vp9)' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+/* ─── v0.4.2 — Flow Control Fields ─── */
+
+function SwitchFields({ data, update }) {
+  return (
+    <>
+      <Field label="Switch Field">
+        <TextInput
+          value={data.switchField || ''}
+          onChange={(v) => update('switchField', v)}
+          placeholder="Field name to switch on"
+        />
+      </Field>
+      <Field label="Cases (JSON)">
+        <TextArea
+          value={JSON.stringify(data.cases || [], null, 2)}
+          onChange={(v) => { try { update('cases', JSON.parse(v)); } catch {} }}
+          placeholder='[{"label": "Case 1", "value": "foo"}]'
+          rows={4}
+          mono
+        />
+      </Field>
+    </>
+  );
+}
+
+function FilterFields({ data, update }) {
+  return (
+    <>
+      <Field label="Filter Expression">
+        <TextArea
+          value={data.filterExpression || ''}
+          onChange={(v) => update('filterExpression', v)}
+          placeholder="e.g. item.score > 0.5"
+          rows={3}
+          mono
+        />
+      </Field>
+      <Field label="Mode">
+        <SelectInput
+          value={data.filterMode || 'include'}
+          onChange={(v) => update('filterMode', v)}
+          options={[
+            { value: 'include', label: 'Include matching' },
+            { value: 'exclude', label: 'Exclude matching' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+function SplitFields({ data, update }) {
+  return (
+    <>
+      <Field label="Split Count">
+        <TextInput
+          type="number"
+          value={data.splitCount ?? 2}
+          onChange={(v) => update('splitCount', parseInt(v) || 2)}
+          placeholder="2"
+        />
+      </Field>
+      <Field label="Split By">
+        <SelectInput
+          value={data.splitBy || 'items'}
+          onChange={(v) => update('splitBy', v)}
+          options={[
+            { value: 'items', label: 'Array items' },
+            { value: 'lines', label: 'Lines' },
+            { value: 'chunks', label: 'Fixed chunks' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+function MergeFields({ data, update }) {
+  return (
+    <Field label="Merge Mode">
+      <SelectInput
+        value={data.mergeMode || 'append'}
+        onChange={(v) => update('mergeMode', v)}
+        options={[
+          { value: 'append', label: 'Append (concatenate)' },
+          { value: 'zip', label: 'Zip (pair items)' },
+          { value: 'merge', label: 'Deep merge' },
+          { value: 'first', label: 'First non-empty' },
+        ]}
+      />
+    </Field>
+  );
+}
+
+function WaitFields({ data, update }) {
+  return (
+    <>
+      <Field label="Duration">
+        <TextInput
+          type="number"
+          value={data.waitDuration ?? 1}
+          onChange={(v) => update('waitDuration', parseFloat(v) || 1)}
+          placeholder="1"
+        />
+      </Field>
+      <Field label="Unit">
+        <SelectInput
+          value={data.waitUnit || 'seconds'}
+          onChange={(v) => update('waitUnit', v)}
+          options={[
+            { value: 'milliseconds', label: 'Milliseconds' },
+            { value: 'seconds', label: 'Seconds' },
+            { value: 'minutes', label: 'Minutes' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+/* ─── v0.4.2 — AI Processing Fields ─── */
+
+function TextClassifierFields({ data, update }) {
+  return (
+    <>
+      <Field label="Categories (comma-separated)">
+        <TextInput
+          value={(data.categories || []).join(', ')}
+          onChange={(v) => update('categories', v.split(',').map(s => s.trim()).filter(Boolean))}
+          placeholder="positive, negative, neutral"
+        />
+      </Field>
+      <Field label="Multi-Label">
+        <SelectInput
+          value={data.multiLabel ? 'true' : 'false'}
+          onChange={(v) => update('multiLabel', v === 'true')}
+          options={[
+            { value: 'false', label: 'Single label' },
+            { value: 'true', label: 'Multi-label' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+function SentimentFields({ data, update }) {
+  return (
+    <>
+      <Field label="Output Format">
+        <SelectInput
+          value={data.outputFormat || 'json'}
+          onChange={(v) => update('outputFormat', v)}
+          options={[
+            { value: 'json', label: 'JSON (score + label)' },
+            { value: 'label', label: 'Label only' },
+            { value: 'score', label: 'Score only (-1 to 1)' },
+          ]}
+        />
+      </Field>
+      <Field label="Granularity">
+        <SelectInput
+          value={data.granularity || 'document'}
+          onChange={(v) => update('granularity', v)}
+          options={[
+            { value: 'document', label: 'Whole document' },
+            { value: 'sentence', label: 'Per sentence' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+function InfoExtractorFields({ data, update }) {
+  return (
+    <Field label="Fields to Extract (comma-separated)">
+      <TextInput
+        value={(data.extractionFields || []).join(', ')}
+        onChange={(v) => update('extractionFields', v.split(',').map(s => s.trim()).filter(Boolean))}
+        placeholder="name, email, phone, company"
+      />
+    </Field>
+  );
+}
+
+function SummarizerFields({ data, update }) {
+  return (
+    <>
+      <Field label="Max Words">
+        <TextInput
+          type="number"
+          value={data.maxLength ?? 200}
+          onChange={(v) => update('maxLength', parseInt(v) || 200)}
+          placeholder="200"
+        />
+      </Field>
+      <Field label="Style">
+        <SelectInput
+          value={data.summaryStyle || 'concise'}
+          onChange={(v) => update('summaryStyle', v)}
+          options={[
+            { value: 'concise', label: 'Concise' },
+            { value: 'detailed', label: 'Detailed' },
+            { value: 'bullet_points', label: 'Bullet Points' },
+            { value: 'executive', label: 'Executive Summary' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+function QAChainFields({ data, update }) {
+  return (
+    <>
+      <Field label="Context Source">
+        <SelectInput
+          value={data.contextSource || 'upstream'}
+          onChange={(v) => update('contextSource', v)}
+          options={[
+            { value: 'upstream', label: 'From upstream node' },
+            { value: 'manual', label: 'Manual context' },
+          ]}
+        />
+      </Field>
+      <Field label="Response Style">
+        <SelectInput
+          value={data.responseStyle || 'detailed'}
+          onChange={(v) => update('responseStyle', v)}
+          options={[
+            { value: 'detailed', label: 'Detailed' },
+            { value: 'brief', label: 'Brief' },
+            { value: 'citation', label: 'With citations' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+/* ─── v0.4.2 — Trigger Fields ─── */
+
+function ScheduleTriggerFields({ data, update }) {
+  return (
+    <>
+      <Field label="Cron Expression">
+        <TextInput
+          value={data.cronExpression || ''}
+          onChange={(v) => update('cronExpression', v)}
+          placeholder="0 * * * *"
+        />
+      </Field>
+      <Field label="Timezone">
+        <TextInput
+          value={data.timezone || 'UTC'}
+          onChange={(v) => update('timezone', v)}
+          placeholder="UTC"
+        />
+      </Field>
+    </>
+  );
+}
+
+function WebhookTriggerFields({ data, update }) {
+  return (
+    <>
+      <Field label="HTTP Method">
+        <SelectInput
+          value={data.webhookMethod || 'POST'}
+          onChange={(v) => update('webhookMethod', v)}
+          options={[
+            { value: 'GET', label: 'GET' },
+            { value: 'POST', label: 'POST' },
+            { value: 'PUT', label: 'PUT' },
+          ]}
+        />
+      </Field>
+      <Field label="Path">
+        <TextInput
+          value={data.webhookPath || ''}
+          onChange={(v) => update('webhookPath', v)}
+          placeholder="webhook"
+        />
+      </Field>
+    </>
+  );
+}
+
+function ChatTriggerFields() {
+  return (
+    <Field label="Info">
+      <p className="text-[11px] text-[var(--dm)]">
+        This trigger fires when a chat message is received. No additional configuration needed.
+      </p>
+    </Field>
+  );
+}
+
+/* ─── v0.4.2 — Data & Tool Fields ─── */
+
+function SortFields({ data, update }) {
+  return (
+    <>
+      <Field label="Sort Field">
+        <TextInput
+          value={data.sortField || ''}
+          onChange={(v) => update('sortField', v)}
+          placeholder="e.g. name, date, score"
+        />
+      </Field>
+      <Field label="Order">
+        <SelectInput
+          value={data.sortOrder || 'asc'}
+          onChange={(v) => update('sortOrder', v)}
+          options={[
+            { value: 'asc', label: 'Ascending (A-Z, 0-9)' },
+            { value: 'desc', label: 'Descending (Z-A, 9-0)' },
+          ]}
+        />
+      </Field>
+    </>
+  );
+}
+
+function AggregateFields({ data, update }) {
+  return (
+    <>
+      <Field label="Operation">
+        <SelectInput
+          value={data.aggregateOp || 'concatenate'}
+          onChange={(v) => update('aggregateOp', v)}
+          options={[
+            { value: 'concatenate', label: 'Concatenate' },
+            { value: 'sum', label: 'Sum' },
+            { value: 'average', label: 'Average' },
+            { value: 'count', label: 'Count' },
+            { value: 'min', label: 'Min' },
+            { value: 'max', label: 'Max' },
+          ]}
+        />
+      </Field>
+      <Field label="Field">
+        <TextInput
+          value={data.aggregateField || ''}
+          onChange={(v) => update('aggregateField', v)}
+          placeholder="Field to aggregate (empty = all)"
+        />
+      </Field>
+    </>
+  );
+}
+
+function DeduplicateFields({ data, update }) {
+  return (
+    <Field label="Deduplicate By">
+      <TextInput
+        value={data.deduplicateField || ''}
+        onChange={(v) => update('deduplicateField', v)}
+        placeholder="Field name or 'auto'"
+      />
+    </Field>
+  );
+}
+
+function CalculatorFields({ data, update }) {
+  return (
+    <Field label="Expression">
+      <TextArea
+        value={data.expression || ''}
+        onChange={(v) => update('expression', v)}
+        placeholder="e.g. (a + b) * 2"
+        rows={3}
+        mono
+      />
+    </Field>
+  );
+}
+
+function SearchFields({ data, update }) {
+  return (
+    <>
+      <Field label="Search Engine">
+        <SelectInput
+          value={data.searchEngine || 'SerpApi'}
+          onChange={(v) => update('searchEngine', v)}
+          options={[
+            { value: 'SerpApi', label: 'SerpApi (Google)' },
+          ]}
+        />
+      </Field>
+      <Field label="Max Results">
+        <TextInput
+          type="number"
+          value={data.maxResults ?? 5}
+          onChange={(v) => update('maxResults', parseInt(v) || 5)}
+          placeholder="5"
+        />
+      </Field>
+    </>
+  );
+}
+
+function WikipediaFields({ data, update }) {
+  return (
+    <>
+      <Field label="Language">
+        <SelectInput
+          value={data.language || 'en'}
+          onChange={(v) => update('language', v)}
+          options={[
+            { value: 'en', label: 'English' },
+            { value: 'es', label: 'Spanish' },
+            { value: 'fr', label: 'French' },
+            { value: 'de', label: 'German' },
+            { value: 'zh', label: 'Chinese' },
+            { value: 'ja', label: 'Japanese' },
+          ]}
+        />
+      </Field>
+      <Field label="Sections">
+        <SelectInput
+          value={data.sections || 'summary'}
+          onChange={(v) => update('sections', v)}
+          options={[
+            { value: 'summary', label: 'Summary only' },
+            { value: 'full', label: 'Full article' },
+            { value: 'sections', label: 'All section titles' },
           ]}
         />
       </Field>

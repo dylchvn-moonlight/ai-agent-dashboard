@@ -16,6 +16,29 @@ import PDFNode from './PDFNode';
 import DocxNode from './DocxNode';
 import BlogNode from './BlogNode';
 import VideoNode from './VideoNode';
+// v0.4.2 — Flow Control
+import SwitchNode from './SwitchNode';
+import FilterNode from './FilterNode';
+import SplitNode from './SplitNode';
+import MergeNode from './MergeNode';
+import WaitNode from './WaitNode';
+// v0.4.2 — AI Processing
+import TextClassifierNode from './TextClassifierNode';
+import SentimentNode from './SentimentNode';
+import InfoExtractorNode from './InfoExtractorNode';
+import SummarizerNode from './SummarizerNode';
+import QAChainNode from './QAChainNode';
+// v0.4.2 — Triggers
+import ScheduleTriggerNode from './ScheduleTriggerNode';
+import WebhookTriggerNode from './WebhookTriggerNode';
+import ChatTriggerNode from './ChatTriggerNode';
+// v0.4.2 — Data & Tools
+import SortNode from './SortNode';
+import AggregateNode from './AggregateNode';
+import DeduplicateNode from './DeduplicateNode';
+import CalculatorNode from './CalculatorNode';
+import SearchNode from './SearchNode';
+import WikipediaNode from './WikipediaNode';
 
 export const nodeTypes = {
   InputNode,
@@ -36,6 +59,25 @@ export const nodeTypes = {
   DocxNode,
   BlogNode,
   VideoNode,
+  SwitchNode,
+  FilterNode,
+  SplitNode,
+  MergeNode,
+  WaitNode,
+  TextClassifierNode,
+  SentimentNode,
+  InfoExtractorNode,
+  SummarizerNode,
+  QAChainNode,
+  ScheduleTriggerNode,
+  WebhookTriggerNode,
+  ChatTriggerNode,
+  SortNode,
+  AggregateNode,
+  DeduplicateNode,
+  CalculatorNode,
+  SearchNode,
+  WikipediaNode,
 };
 
 export {
@@ -57,4 +99,23 @@ export {
   DocxNode,
   BlogNode,
   VideoNode,
+  SwitchNode,
+  FilterNode,
+  SplitNode,
+  MergeNode,
+  WaitNode,
+  TextClassifierNode,
+  SentimentNode,
+  InfoExtractorNode,
+  SummarizerNode,
+  QAChainNode,
+  ScheduleTriggerNode,
+  WebhookTriggerNode,
+  ChatTriggerNode,
+  SortNode,
+  AggregateNode,
+  DeduplicateNode,
+  CalculatorNode,
+  SearchNode,
+  WikipediaNode,
 };

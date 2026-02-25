@@ -437,6 +437,52 @@ class AgentEngine {
       case 'VideoNode':
         return this._execVideo(nodeData, nodeInput, agent.id, executionId);
 
+      /* ─── v0.4.2 — Flow Control ─── */
+      case 'SwitchNode':
+        return this._execSwitch(nodeData, nodeInput, edges, nodeId, skipSet);
+      case 'FilterNode':
+        return this._execFilter(nodeData, nodeInput);
+      case 'SplitNode':
+        return this._execSplit(nodeData, nodeInput);
+      case 'MergeNode':
+        return this._execMerge(nodeData, nodeInput);
+      case 'WaitNode':
+        return this._execWait(nodeData, nodeInput, signal);
+
+      /* ─── v0.4.2 — AI Processing ─── */
+      case 'TextClassifierNode':
+        return this._execTextClassifier(nodeData, nodeInput, credentials, settings);
+      case 'SentimentNode':
+        return this._execSentiment(nodeData, nodeInput, credentials, settings);
+      case 'InfoExtractorNode':
+        return this._execInfoExtractor(nodeData, nodeInput, credentials, settings);
+      case 'SummarizerNode':
+        return this._execSummarizer(nodeData, nodeInput, credentials, settings);
+      case 'QAChainNode':
+        return this._execQAChain(nodeData, nodeInput, credentials, settings);
+
+      /* ─── v0.4.2 — Triggers ─── */
+      case 'ScheduleTriggerNode':
+        return this._execScheduleTrigger(nodeData, userInput);
+      case 'WebhookTriggerNode':
+        return this._execWebhookTrigger(nodeData, userInput);
+      case 'ChatTriggerNode':
+        return this._execChatTrigger(nodeData, userInput);
+
+      /* ─── v0.4.2 — Data & Tools ─── */
+      case 'SortNode':
+        return this._execSort(nodeData, nodeInput);
+      case 'AggregateNode':
+        return this._execAggregate(nodeData, nodeInput);
+      case 'DeduplicateNode':
+        return this._execDeduplicate(nodeData, nodeInput);
+      case 'CalculatorNode':
+        return this._execCalculator(nodeData, nodeInput);
+      case 'SearchNode':
+        return this._execSearch(nodeData, nodeInput, signal);
+      case 'WikipediaNode':
+        return this._execWikipedia(nodeData, nodeInput, signal);
+
       default:
         throw new Error(`Unknown node type: ${nodeType}`);
     }
@@ -1418,6 +1464,347 @@ ${htmlContent}
         skipSet.add(edge.target);
         this._markDownstream(edge.target, edges, skipSet, false);
       }
+    }
+  }
+
+  // =========================================================================
+  // v0.4.2 — Flow Control Executors
+  // =========================================================================
+
+  _execSwitch(nodeData, nodeInput, edges, nodeId, skipSet) {
+    const field = nodeData.switchField || 'value';
+    let testVal;
+    try {
+      const parsed = typeof nodeInput === 'string' ? JSON.parse(nodeInput) : nodeInput;
+      testVal = parsed?.[field] ?? String(nodeInput);
+    } catch {
+      testVal = String(nodeInput);
+    }
+
+    const cases = nodeData.cases || [];
+    let matchedIdx = -1;
+    let defaultIdx = -1;
+    for (let i = 0; i < cases.length; i++) {
+      if (cases[i].value === '*') { defaultIdx = i; continue; }
+      if (String(cases[i].value) === String(testVal)) { matchedIdx = i; break; }
+    }
+    if (matchedIdx === -1) matchedIdx = defaultIdx;
+
+    // Skip downstream of non-matching handles
+    const outEdges = edges.filter((e) => e.source === nodeId);
+    for (let i = 0; i < cases.length; i++) {
+      if (i === matchedIdx) continue;
+      const handleId = `case-${i}`;
+      outEdges
+        .filter((e) => e.sourceHandle === handleId)
+        .forEach((e) => this._markDownstream(e.target, edges, skipSet, true));
+    }
+
+    return nodeInput;
+  }
+
+  _execFilter(nodeData, nodeInput) {
+    const expr = nodeData.filterExpression || '';
+    if (!expr) return nodeInput;
+
+    let items;
+    try {
+      items = typeof nodeInput === 'string' ? JSON.parse(nodeInput) : nodeInput;
+    } catch {
+      return nodeInput;
+    }
+
+    if (!Array.isArray(items)) return nodeInput;
+
+    // Safe evaluation using Function constructor with item parameter only
+    const filterFn = new Function('item', `return (${expr})`);
+    const filtered = items.filter((item) => {
+      try { return filterFn(item); } catch { return false; }
+    });
+    return nodeData.filterMode === 'exclude'
+      ? items.filter((item) => !filtered.includes(item))
+      : filtered;
+  }
+
+  _execSplit(nodeData, nodeInput) {
+    let items;
+    try {
+      items = typeof nodeInput === 'string' ? JSON.parse(nodeInput) : nodeInput;
+    } catch {
+      items = String(nodeInput).split('\n');
+    }
+    if (!Array.isArray(items)) items = [items];
+    return items;
+  }
+
+  _execMerge(nodeData, nodeInput) {
+    if (!Array.isArray(nodeInput)) return nodeInput;
+    const mode = nodeData.mergeMode || 'append';
+    switch (mode) {
+      case 'zip':
+        return nodeInput;
+      case 'merge':
+        if (nodeInput.every((i) => typeof i === 'object' && i !== null)) {
+          return Object.assign({}, ...nodeInput);
+        }
+        return nodeInput.join('\n');
+      case 'first':
+        return nodeInput.find((i) => i != null && i !== '') ?? '';
+      case 'append':
+      default:
+        return nodeInput.map((i) => typeof i === 'string' ? i : JSON.stringify(i)).join('\n');
+    }
+  }
+
+  async _execWait(nodeData, nodeInput, signal) {
+    const duration = nodeData.waitDuration || 1;
+    const unit = nodeData.waitUnit || 'seconds';
+    let ms = duration;
+    if (unit === 'seconds') ms = duration * 1000;
+    else if (unit === 'minutes') ms = duration * 60000;
+
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(resolve, ms);
+      if (signal) {
+        signal.addEventListener('abort', () => {
+          clearTimeout(timer);
+          reject(new Error('Wait aborted'));
+        }, { once: true });
+      }
+    });
+
+    return nodeInput;
+  }
+
+  // =========================================================================
+  // v0.4.2 — AI Processing Executors (all use llmRouter internally)
+  // =========================================================================
+
+  async _execAIProcessing(systemPrompt, nodeInput, credentials, settings) {
+    const provider = settings.defaultProvider || 'claude';
+    const config = {
+      model: settings.defaultModel || 'claude-sonnet-4-6',
+      systemPrompt,
+      temperature: 0.3,
+      maxTokens: 2048,
+    };
+    const result = await this.llmRouter.call(provider, config, nodeInput, credentials);
+    return {
+      __engineResult: true,
+      output: result.text,
+      tokens: result.tokens,
+    };
+  }
+
+  async _execTextClassifier(nodeData, nodeInput, credentials, settings) {
+    const categories = (nodeData.categories || []).join(', ');
+    const multi = nodeData.multiLabel ? 'You may assign multiple labels.' : 'Assign exactly one label.';
+    const prompt = `You are a text classifier. Classify the following text into one of these categories: ${categories}. ${multi}\n\nRespond with ONLY a JSON object: {"label": "category"} (or {"labels": ["cat1","cat2"]} if multi-label). No other text.`;
+    return this._execAIProcessing(prompt, nodeInput, credentials, settings);
+  }
+
+  async _execSentiment(nodeData, nodeInput, credentials, settings) {
+    const gran = nodeData.granularity || 'document';
+    const prompt = `You are a sentiment analyzer. Analyze the sentiment of the following text at the ${gran} level.\n\nRespond with ONLY a JSON object: {"sentiment": "positive|negative|neutral|mixed", "score": <-1.0 to 1.0>, "confidence": <0.0 to 1.0>}. No other text.`;
+    return this._execAIProcessing(prompt, nodeInput, credentials, settings);
+  }
+
+  async _execInfoExtractor(nodeData, nodeInput, credentials, settings) {
+    const fields = (nodeData.extractionFields || []).join(', ');
+    const prompt = `You are a structured data extractor. Extract the following fields from the text: ${fields}.\n\nRespond with ONLY a JSON object containing the extracted fields. Use null for fields not found. No other text.`;
+    return this._execAIProcessing(prompt, nodeInput, credentials, settings);
+  }
+
+  async _execSummarizer(nodeData, nodeInput, credentials, settings) {
+    const maxLen = nodeData.maxLength || 200;
+    const style = nodeData.summaryStyle || 'concise';
+    const prompt = `You are a summarizer. Summarize the following text in a ${style} style. Keep the summary under ${maxLen} words. Return ONLY the summary text, no preamble.`;
+    return this._execAIProcessing(prompt, nodeInput, credentials, settings);
+  }
+
+  async _execQAChain(nodeData, nodeInput, credentials, settings) {
+    const style = nodeData.responseStyle || 'detailed';
+    const prompt = `You are a Q&A assistant. The user has provided context and a question. Answer based ONLY on the provided context. Give a ${style} response. If the answer is not in the context, say "I don't have enough information to answer that."`;
+    return this._execAIProcessing(prompt, nodeInput, credentials, settings);
+  }
+
+  // =========================================================================
+  // v0.4.2 — Trigger Executors (passthrough in execution context)
+  // =========================================================================
+
+  _execScheduleTrigger(nodeData, userInput) {
+    return userInput || `Scheduled trigger: ${nodeData.cronExpression || '0 * * * *'}`;
+  }
+
+  _execWebhookTrigger(nodeData, userInput) {
+    return userInput || `Webhook: ${nodeData.webhookMethod || 'POST'} /${nodeData.webhookPath || 'webhook'}`;
+  }
+
+  _execChatTrigger(nodeData, userInput) {
+    return userInput || '';
+  }
+
+  // =========================================================================
+  // v0.4.2 — Data & Tool Executors
+  // =========================================================================
+
+  _execSort(nodeData, nodeInput) {
+    let items;
+    try {
+      items = typeof nodeInput === 'string' ? JSON.parse(nodeInput) : nodeInput;
+    } catch {
+      return nodeInput;
+    }
+    if (!Array.isArray(items)) return nodeInput;
+
+    const field = nodeData.sortField || 'value';
+    const order = nodeData.sortOrder || 'asc';
+    const sorted = [...items].sort((a, b) => {
+      const va = typeof a === 'object' ? a[field] : a;
+      const vb = typeof b === 'object' ? b[field] : b;
+      if (va < vb) return order === 'asc' ? -1 : 1;
+      if (va > vb) return order === 'asc' ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  }
+
+  _execAggregate(nodeData, nodeInput) {
+    let items;
+    try {
+      items = typeof nodeInput === 'string' ? JSON.parse(nodeInput) : nodeInput;
+    } catch {
+      return nodeInput;
+    }
+    if (!Array.isArray(items)) return nodeInput;
+
+    const op = nodeData.aggregateOp || 'concatenate';
+    const field = nodeData.aggregateField;
+    const values = field ? items.map((i) => i[field]).filter((v) => v != null) : items;
+
+    switch (op) {
+      case 'sum':
+        return values.reduce((s, v) => s + (parseFloat(v) || 0), 0);
+      case 'average': {
+        const nums = values.map((v) => parseFloat(v)).filter((n) => !isNaN(n));
+        return nums.length > 0 ? nums.reduce((s, v) => s + v, 0) / nums.length : 0;
+      }
+      case 'count':
+        return values.length;
+      case 'min':
+        return Math.min(...values.map((v) => parseFloat(v)).filter((n) => !isNaN(n)));
+      case 'max':
+        return Math.max(...values.map((v) => parseFloat(v)).filter((n) => !isNaN(n)));
+      case 'concatenate':
+      default:
+        return values.map((v) => typeof v === 'string' ? v : JSON.stringify(v)).join('\n');
+    }
+  }
+
+  _execDeduplicate(nodeData, nodeInput) {
+    let items;
+    try {
+      items = typeof nodeInput === 'string' ? JSON.parse(nodeInput) : nodeInput;
+    } catch {
+      return nodeInput;
+    }
+    if (!Array.isArray(items)) return nodeInput;
+
+    const field = nodeData.deduplicateField;
+    if (field && field !== 'auto') {
+      const seen = new Set();
+      return items.filter((item) => {
+        const key = typeof item === 'object' ? item[field] : item;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+    // Auto: use JSON stringification
+    const seen = new Set();
+    return items.filter((item) => {
+      const key = JSON.stringify(item);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }
+
+  _execCalculator(nodeData, nodeInput) {
+    let expr = nodeData.expression || '';
+    if (!expr) expr = String(nodeInput);
+
+    // Replace variable references with the input value
+    if (typeof nodeInput === 'object' && nodeInput !== null) {
+      for (const [key, val] of Object.entries(nodeInput)) {
+        expr = expr.replace(new RegExp(`\\b${key}\\b`, 'g'), String(val));
+      }
+    } else {
+      expr = expr.replace(/\binput\b/g, String(nodeInput));
+    }
+
+    // Safe math evaluation using Function constructor
+    const fn = new Function(`return (${expr})`);
+    return fn();
+  }
+
+  async _execSearch(nodeData, nodeInput, signal) {
+    const query = typeof nodeInput === 'string' ? nodeInput : JSON.stringify(nodeInput);
+    const maxResults = nodeData.maxResults || 5;
+    const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+
+    try {
+      const fetch = (await import('node-fetch')).default;
+      const res = await fetch(url, { signal });
+      const html = await res.text();
+
+      // Extract result snippets from DuckDuckGo HTML
+      const results = [];
+      const regex = /<a[^>]+class="result__a"[^>]*>([^<]+)<\/a>[\s\S]*?<a[^>]+class="result__snippet"[^>]*>([\s\S]*?)<\/a>/g;
+      let match;
+      while ((match = regex.exec(html)) !== null && results.length < maxResults) {
+        results.push({
+          title: match[1].trim(),
+          snippet: match[2].replace(/<[^>]+>/g, '').trim(),
+        });
+      }
+
+      return results.length > 0
+        ? results.map((r, i) => `${i + 1}. ${r.title}\n   ${r.snippet}`).join('\n\n')
+        : `No search results found for: ${query}`;
+    } catch (err) {
+      return `Search failed: ${err.message}`;
+    }
+  }
+
+  async _execWikipedia(nodeData, nodeInput, signal) {
+    const query = typeof nodeInput === 'string' ? nodeInput : String(nodeInput);
+    const lang = nodeData.language || 'en';
+    const sections = nodeData.sections || 'summary';
+    const url = `https://${lang}.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(query)}`;
+
+    try {
+      const fetch = (await import('node-fetch')).default;
+      const res = await fetch(url, { signal });
+
+      if (!res.ok) {
+        return `Wikipedia: No article found for "${query}"`;
+      }
+
+      const data = await res.json();
+
+      if (sections === 'summary') {
+        return `# ${data.title}\n\n${data.extract}`;
+      }
+
+      // Full article — fetch HTML and strip tags
+      const fullUrl = `https://${lang}.wikipedia.org/api/rest_v1/page/html/${encodeURIComponent(data.title)}`;
+      const fullRes = await fetch(fullUrl, { signal });
+      const html = await fullRes.text();
+      const stripped = html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+      return `# ${data.title}\n\n${stripped.slice(0, 5000)}`;
+    } catch (err) {
+      return `Wikipedia lookup failed: ${err.message}`;
     }
   }
 }

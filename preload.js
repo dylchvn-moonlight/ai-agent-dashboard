@@ -76,6 +76,23 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('artifact:created', handler);
   },
 
+  // Terminal
+  terminalSpawn: (params) => ipcRenderer.invoke('terminal:spawn', params),
+  terminalWrite: (params) => ipcRenderer.invoke('terminal:write', params),
+  terminalResize: (params) => ipcRenderer.invoke('terminal:resize', params),
+  terminalKill: (params) => ipcRenderer.invoke('terminal:kill', params),
+  terminalGetCwd: () => ipcRenderer.invoke('terminal:get-cwd'),
+  onTerminalData: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('terminal:data', handler);
+    return () => ipcRenderer.removeListener('terminal:data', handler);
+  },
+  onTerminalExit: (callback) => {
+    const handler = (_event, data) => callback(data);
+    ipcRenderer.on('terminal:exit', handler);
+    return () => ipcRenderer.removeListener('terminal:exit', handler);
+  },
+
   // Widget export
   saveWidget: (params) => ipcRenderer.invoke('widget:save', params),
 

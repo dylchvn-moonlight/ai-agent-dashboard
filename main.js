@@ -393,6 +393,10 @@ const agentEngine = new AgentEngine();
 const ArtifactManager = require('./artifact-manager');
 const artifactManager = new ArtifactManager();
 
+// Terminal manager
+const TerminalManager = require('./terminal-manager');
+const terminalManager = new TerminalManager();
+
 /**
  * Helper: load all decrypted credentials into a plain object
  * so the engine can use them without re-decrypting per node.
@@ -481,6 +485,48 @@ ipcMain.handle('artifact:open-folder', async () => {
   } catch (e) {
     return { success: false, error: e.message };
   }
+});
+
+// --- Terminal IPC Handlers ---
+
+ipcMain.handle('terminal:spawn', async (_event, { id, shell, cwd }) => {
+  try {
+    const result = terminalManager.spawn(id, { shell, cwd });
+    if (!result.success) return result;
+
+    const proc = terminalManager.getProcess(id);
+    if (proc) {
+      proc.stdout.on('data', (data) => {
+        mainWindow?.webContents?.send('terminal:data', { id, data: data.toString() });
+      });
+      proc.stderr.on('data', (data) => {
+        mainWindow?.webContents?.send('terminal:data', { id, data: data.toString() });
+      });
+      proc.on('exit', (code) => {
+        mainWindow?.webContents?.send('terminal:exit', { id, code });
+      });
+    }
+
+    return result;
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('terminal:write', async (_event, { id, data }) => {
+  return terminalManager.write(id, data);
+});
+
+ipcMain.handle('terminal:resize', async (_event, { id, cols, rows }) => {
+  return terminalManager.resize(id, cols, rows);
+});
+
+ipcMain.handle('terminal:kill', async (_event, { id }) => {
+  return terminalManager.kill(id);
+});
+
+ipcMain.handle('terminal:get-cwd', async () => {
+  return terminalManager.getDefaultCwd();
 });
 
 // --- Email IPC Handlers (Nodemailer) ---
@@ -932,6 +978,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  terminalManager.killAll();
   mainWindow = null;
   app.quit();
 });

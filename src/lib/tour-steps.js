@@ -187,6 +187,44 @@ export const TOUR_STEPS = {
     },
   ],
 
+  chatbot: [
+    {
+      target: '[data-tour="chatbot-builder"]',
+      title: 'Chatbot Builder',
+      content: 'Create customer-facing AI chatbots here. Fill in your business info, FAQs, and products — the system auto-generates a ready-to-use agent.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="chatbot-profile"]',
+      title: 'Business Profile',
+      content: 'Enter your business name, industry, and description. This context helps the chatbot respond accurately about your company.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="chatbot-knowledge"]',
+      title: 'Knowledge Base',
+      content: 'Add FAQs, products, and custom instructions. The chatbot uses this knowledge to answer customer questions.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="chatbot-preview"]',
+      title: 'Live Preview',
+      content: 'See a real-time mockup of how your chat widget will look and feel. Test the conversation flow before generating the agent.',
+      placement: 'left',
+      disableBeacon: true,
+    },
+    {
+      target: '[data-tour="chatbot-generate"]',
+      title: 'Generate Agent',
+      content: 'Click here to convert your chatbot config into a full agent flow. It creates Input → Memory → LLM → Output nodes automatically.',
+      placement: 'bottom',
+      disableBeacon: true,
+    },
+  ],
+
   settings: [
     {
       target: '[data-tour="settings-api-keys"]',

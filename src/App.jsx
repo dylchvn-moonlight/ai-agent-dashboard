@@ -15,6 +15,7 @@ import DeploymentCenter from '@/views/DeploymentCenter';
 import ResourceLibrary from '@/views/ResourceLibrary';
 import MediaLibrary from '@/views/MediaLibrary';
 import Settings from '@/views/Settings';
+import ChatbotBuilder from '@/views/ChatbotBuilder';
 
 const VIEW_MAP = {
   dashboard: Dashboard,
@@ -24,6 +25,7 @@ const VIEW_MAP = {
   deploy: DeploymentCenter,
   resources: ResourceLibrary,
   media: MediaLibrary,
+  chatbot: ChatbotBuilder,
   settings: Settings,
 };
 

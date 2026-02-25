@@ -187,12 +187,14 @@ export default function AgentBuilder() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Left: Node Panel */}
-      <NodePanel />
+      <div data-tour="node-panel">
+        <NodePanel />
+      </div>
 
       {/* Center: React Flow Canvas */}
       <div className="flex-1 flex flex-col relative" ref={reactFlowWrapper}>
         {/* Top bar */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-[var(--sf)]/60 backdrop-blur-sm border-b border-[var(--glassBd)] z-10">
+        <div data-tour="builder-topbar" className="flex items-center justify-between px-4 py-2.5 bg-[var(--sf)]/60 backdrop-blur-sm border-b border-[var(--glassBd)] z-10">
           <div className="flex items-center gap-3">
             <input
               type="text"
@@ -251,7 +253,7 @@ export default function AgentBuilder() {
         </div>
 
         {/* Canvas */}
-        <div className="flex-1">
+        <div className="flex-1" data-tour="builder-canvas">
           <ReactFlow
             nodes={nodes}
             edges={edges}

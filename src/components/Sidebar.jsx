@@ -11,6 +11,7 @@ import {
   PanelLeft,
   Search,
   FolderOpen,
+  HelpCircle,
 } from 'lucide-react';
 import useUiStore from '@/stores/ui-store';
 
@@ -30,6 +31,11 @@ export default function Sidebar() {
   const setView = useUiStore((s) => s.setView);
   const collapsed = useUiStore((s) => s.sidebarCollapsed);
   const toggleSidebar = useUiStore((s) => s.toggleSidebar);
+  const startTour = useUiStore((s) => s.startTour);
+
+  const handleHelp = () => {
+    startTour(view);
+  };
 
   return (
     <aside
@@ -77,6 +83,30 @@ export default function Sidebar() {
           );
         })}
       </nav>
+
+      {/* Help / Tour trigger */}
+      {!collapsed ? (
+        <div className="px-2 pb-2">
+          <button
+            onClick={handleHelp}
+            className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-xs text-[var(--dm)] hover:text-[var(--sb)] hover:bg-white/[0.04] transition-colors"
+            title="Show guided tour for this tab"
+          >
+            <HelpCircle size={15} />
+            <span>Help &amp; Tour</span>
+          </button>
+        </div>
+      ) : (
+        <div className="px-2 pb-2 flex justify-center">
+          <button
+            onClick={handleHelp}
+            className="flex items-center justify-center w-9 h-9 rounded-lg text-[var(--dm)] hover:text-[var(--sb)] hover:bg-white/[0.04] transition-colors"
+            title="Show guided tour"
+          >
+            <HelpCircle size={17} />
+          </button>
+        </div>
+      )}
 
       {/* Command palette trigger */}
       {!collapsed && (

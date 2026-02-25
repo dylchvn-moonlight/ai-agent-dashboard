@@ -247,7 +247,7 @@ export default function TrainingStudio() {
   return (
     <div className="h-full overflow-y-auto p-6 space-y-4">
       {/* ─── Top Agent Bar ─── */}
-      <div className={`${GLASS} px-5 py-3 flex items-center gap-3`}>
+      <div data-tour="training-agent-bar" className={`${GLASS} px-5 py-3 flex items-center gap-3`}>
         <div
           className="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
           style={{ backgroundColor: (agent.color || '#6366f1') + '18' }}
@@ -278,7 +278,7 @@ export default function TrainingStudio() {
       {/* ─── Main Panels ─── */}
       <div className="flex gap-4 min-h-[520px]">
         {/* ─── Left: Test Case Manager (40%) ─── */}
-        <div className={`${GLASS} w-[40%] flex flex-col shrink-0`}>
+        <div data-tour="test-cases" className={`${GLASS} w-[40%] flex flex-col shrink-0`}>
           {/* header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--glassBd)]">
             <div className="flex items-center gap-2">
@@ -403,7 +403,7 @@ export default function TrainingStudio() {
         </div>
 
         {/* ─── Right: Test Runner (60%) ─── */}
-        <div className="flex-1 flex flex-col gap-4 min-w-0">
+        <div data-tour="test-runner" className="flex-1 flex flex-col gap-4 min-w-0">
           {/* Input + Run */}
           <div className={`${GLASS} p-4 space-y-3`}>
             <div className="flex items-center justify-between">
@@ -582,7 +582,7 @@ export default function TrainingStudio() {
       </div>
 
       {/* ─── Session History (collapsible) ─── */}
-      <div className={GLASS}>
+      <div data-tour="training-history" className={GLASS}>
         <button
           onClick={() => setHistoryOpen(!historyOpen)}
           className="w-full flex items-center justify-between px-4 py-3 text-left"

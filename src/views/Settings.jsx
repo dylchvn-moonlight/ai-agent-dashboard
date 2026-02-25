@@ -57,9 +57,9 @@ function maskValue(val) {
 }
 
 /* ─── reusable section wrapper ─── */
-function Section({ icon: Icon, title, children }) {
+function Section({ icon: Icon, title, children, tourId }) {
   return (
-    <div className="bg-[var(--glass)] backdrop-blur-md border border-[var(--glassBd)] rounded-xl p-5">
+    <div className="bg-[var(--glass)] backdrop-blur-md border border-[var(--glassBd)] rounded-xl p-5" data-tour={tourId}>
       <div className="flex items-center gap-2 mb-4">
         <Icon size={16} className="text-[var(--blue)]" />
         <h2 className="text-sm font-semibold text-[var(--hd)]">{title}</h2>
@@ -1022,7 +1022,7 @@ export default function Settings() {
 
       <div className="space-y-5 max-w-2xl">
         {/* ── 1. API Keys (Multi-Key) ── */}
-        <Section icon={Key} title="API Keys">
+        <Section icon={Key} title="API Keys" tourId="settings-api-keys">
           <div className="space-y-4">
             <ApiKeyManager provider="anthropic" placeholder="sk-ant-..." />
 
@@ -1166,7 +1166,7 @@ export default function Settings() {
         </Section>
 
         {/* ── 2. Default Model Settings ── */}
-        <Section icon={Cpu} title="Default Model Settings">
+        <Section icon={Cpu} title="Default Model Settings" tourId="settings-models">
           <div className="space-y-4">
             {/* Provider */}
             <div className="space-y-1.5">
@@ -1279,7 +1279,7 @@ export default function Settings() {
         </Section>
 
         {/* ── 4. Data Management ── */}
-        <Section icon={Database} title="Data Management">
+        <Section icon={Database} title="Data Management" tourId="settings-data">
           <div className="space-y-3">
             {/* Export */}
             <div className="flex items-center justify-between">

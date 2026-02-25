@@ -152,7 +152,7 @@ export default function MediaLibrary() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div data-tour="media-stats" className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <StatCard icon={Files} label="Total Files" value={totalCount} />
         <StatCard icon={HardDrive} label="Storage" value={formatBytes(totalStorage)} />
         {TYPE_CONFIG.filter((t) => t.id !== 'all').map((t) => (
@@ -167,7 +167,7 @@ export default function MediaLibrary() {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center gap-3">
+      <div data-tour="media-filter" className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--dm)]" />
           <input
@@ -210,7 +210,7 @@ export default function MediaLibrary() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
+        <div data-tour="media-grid" className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-3">
           {filtered.map((artifact) => {
             const Icon = getIconForType(artifact.type);
             const color = getColorForType(artifact.type);

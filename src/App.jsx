@@ -29,30 +29,52 @@ const VIEW_MAP = {
 
 export default function App() {
   const view = useUiStore((s) => s.view);
+  const tourActiveView = useUiStore((s) => s.tourActiveView);
+  const completedTours = useUiStore((s) => s.completedTours);
+  const startTour = useUiStore((s) => s.startTour);
+  const finishTour = useUiStore((s) => s.finishTour);
+  const loadCompletedTours = useUiStore((s) => s.loadCompletedTours);
   const ActiveView = VIEW_MAP[view] || Dashboard;
 
   // Onboarding state
   const [showWelcome, setShowWelcome] = useState(false);
-  const [showTour, setShowTour] = useState(false);
+  const [onboardingDone, setOnboardingDone] = useState(false);
 
-  // Check onboarding on mount
+  // Load completed tours + check onboarding on mount
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      await loadCompletedTours();
       try {
         const settings = await window.electronAPI?.loadSettings();
         if (!cancelled && !settings?.onboardingComplete) {
           setShowWelcome(true);
+        } else {
+          setOnboardingDone(true);
         }
       } catch {
-        // In browser dev mode, show onboarding if not seen
         if (!cancelled && !localStorage.getItem('onboardingComplete')) {
           setShowWelcome(true);
+        } else {
+          setOnboardingDone(true);
         }
       }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  // Auto-trigger tour on first visit to each view (after onboarding)
+  useEffect(() => {
+    if (!onboardingDone) return;
+    if (tourActiveView) return; // already showing a tour
+    if (completedTours[view]) return; // already completed this view's tour
+
+    // Small delay so DOM has data-tour attributes ready
+    const timer = setTimeout(() => {
+      startTour(view);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [view, onboardingDone, completedTours, tourActiveView]);
 
   const handleWelcomeClose = useCallback(async () => {
     setShowWelcome(false);
@@ -66,13 +88,16 @@ export default function App() {
   }, []);
 
   const handleStartTour = useCallback(() => {
+    setOnboardingDone(true);
     // Small delay so DOM has data-tour attributes ready
-    setTimeout(() => setShowTour(true), 300);
-  }, []);
+    setTimeout(() => startTour('dashboard'), 300);
+  }, [startTour]);
 
   const handleTourFinish = useCallback(() => {
-    setShowTour(false);
-  }, []);
+    if (tourActiveView) {
+      finishTour(tourActiveView);
+    }
+  }, [tourActiveView, finishTour]);
 
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-[var(--bg)]">
@@ -96,7 +121,11 @@ export default function App() {
         onClose={handleWelcomeClose}
         onStartTour={handleStartTour}
       />
-      <GuidedTour run={showTour} onFinish={handleTourFinish} />
+      <GuidedTour
+        viewId={tourActiveView}
+        run={!!tourActiveView}
+        onFinish={handleTourFinish}
+      />
 
       {/* Update notification toast */}
       <UpdateNotification />

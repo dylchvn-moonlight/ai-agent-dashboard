@@ -540,7 +540,7 @@ export default function ExecutionMonitor() {
     <div className="h-full overflow-y-auto p-6">
       <div className="max-w-6xl mx-auto space-y-4">
         {/* ---- Header ---- */}
-        <div className="flex items-center justify-between">
+        <div data-tour="monitor-header" className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-[var(--green)]/10 flex items-center justify-center">
               <Activity size={20} className="text-[var(--green)]" />
@@ -668,7 +668,7 @@ export default function ExecutionMonitor() {
         {/* ---- Main content: Trace + History side-by-side ---- */}
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_280px] gap-4">
           {/* ---- Execution Trace ---- */}
-          <div className="space-y-2">
+          <div data-tour="execution-trace" className="space-y-2">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold text-[var(--hd)] flex items-center gap-2">
                 <BarChart3 size={14} className="text-[var(--sb)]" />
@@ -711,7 +711,7 @@ export default function ExecutionMonitor() {
           </div>
 
           {/* ---- History Sidebar ---- */}
-          <div className="space-y-2">
+          <div data-tour="monitor-history" className="space-y-2">
             <h2 className="text-sm font-semibold text-[var(--hd)] flex items-center gap-2">
               <History size={14} className="text-[var(--sb)]" />
               History

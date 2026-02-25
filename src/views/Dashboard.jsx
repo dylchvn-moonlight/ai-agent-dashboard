@@ -57,6 +57,7 @@ export default function Dashboard() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setShowTemplates(true)}
+            data-tour="templates-btn"
             className="flex items-center gap-2 px-4 py-2.5 border border-[var(--glassBd)] hover:bg-white/5 text-[var(--sb)] text-sm font-medium rounded-lg transition-colors"
           >
             <LayoutTemplate size={16} />
@@ -74,7 +75,7 @@ export default function Dashboard() {
       </div>
 
       {/* Stats Row */}
-      <div className="grid grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-4 gap-4 mb-8" data-tour="dashboard-stats">
         <StatCard
           label="Total Agents"
           value={stats.total}

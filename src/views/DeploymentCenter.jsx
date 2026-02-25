@@ -147,7 +147,7 @@ export default function DeploymentCenter() {
       </div>
 
       {/* Deployment Targets */}
-      <div className="grid grid-cols-4 gap-3">
+      <div data-tour="deploy-targets" className="grid grid-cols-4 gap-3">
         {DEPLOY_TARGETS.map((t) => {
           const Icon = t.icon;
           const isActive = selectedTarget === t.id;
@@ -184,7 +184,7 @@ export default function DeploymentCenter() {
       </div>
 
       {/* Deploy Action */}
-      <div className="bg-[var(--glass)] backdrop-blur-md border border-[var(--glassBd)] rounded-xl p-5 space-y-4">
+      <div data-tour="deploy-action" className="bg-[var(--glass)] backdrop-blur-md border border-[var(--glassBd)] rounded-xl p-5 space-y-4">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-[var(--hd)]">
@@ -312,7 +312,7 @@ export default function DeploymentCenter() {
       )}
 
       {/* Export Agent JSON */}
-      <div className="bg-[var(--glass)] backdrop-blur-md border border-[var(--glassBd)] rounded-xl p-5">
+      <div data-tour="deploy-export" className="bg-[var(--glass)] backdrop-blur-md border border-[var(--glassBd)] rounded-xl p-5">
         <div className="flex items-center justify-between">
           <div>
             <h3 className="text-sm font-semibold text-[var(--hd)]">Export Agent Definition</h3>

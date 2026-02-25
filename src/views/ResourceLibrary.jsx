@@ -166,6 +166,7 @@ export default function ResourceLibrary() {
             setFormDescription('');
             setShowAddForm(true);
           }}
+          data-tour="resource-add"
           className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white text-sm font-medium rounded-lg transition-colors"
         >
           <Plus size={16} />
@@ -174,7 +175,7 @@ export default function ResourceLibrary() {
       </div>
 
       {/* Filters + Search */}
-      <div className="flex items-center gap-3">
+      <div data-tour="resource-search" className="flex items-center gap-3">
         <div className="relative flex-1 max-w-xs">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--dm)]" />
           <input
@@ -322,7 +323,7 @@ export default function ResourceLibrary() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3">
+        <div data-tour="resource-grid" className="grid grid-cols-[repeat(auto-fill,minmax(340px,1fr))] gap-3">
           {filtered.map((resource) => {
             const rt = RESOURCE_TYPES.find((t) => t.id === resource.type);
             const Icon = rt?.icon || FileText;

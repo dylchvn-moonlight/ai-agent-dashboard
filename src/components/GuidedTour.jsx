@@ -1,36 +1,6 @@
 import React, { useState, useCallback } from 'react';
 import Joyride, { STATUS } from 'react-joyride';
-
-const STEPS = [
-  {
-    target: '[data-tour="sidebar"]',
-    title: 'Navigation',
-    content: 'Use the sidebar to navigate between Dashboard, Agent Builder, Training, Monitor, Deploy, Resources, and Settings.',
-    placement: 'right',
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="dashboard-header"]',
-    title: 'Your Agents',
-    content: 'The Dashboard shows all your AI agents at a glance — their status, recent activity, and quick stats.',
-    placement: 'bottom',
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="new-agent-btn"]',
-    title: 'Create an Agent',
-    content: 'Click here to create a new AI agent. You\'ll design its workflow visually in the Agent Builder.',
-    placement: 'left',
-    disableBeacon: true,
-  },
-  {
-    target: '[data-tour="settings-nav"]',
-    title: 'Configure Settings',
-    content: 'Head to Settings to add your API keys, set default model preferences, and manage your data.',
-    placement: 'right',
-    disableBeacon: true,
-  },
-];
+import { getTourSteps } from '@/lib/tour-steps';
 
 const tooltipStyles = {
   options: {
@@ -77,13 +47,15 @@ const tooltipStyles = {
   },
 };
 
-export default function GuidedTour({ run, onFinish }) {
+export default function GuidedTour({ viewId, run, onFinish }) {
   const [stepIndex, setStepIndex] = useState(0);
+  const steps = getTourSteps(viewId);
 
   const handleCallback = useCallback((data) => {
     const { status, index, type } = data;
 
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
+      setStepIndex(0);
       onFinish?.();
     }
 
@@ -92,9 +64,16 @@ export default function GuidedTour({ run, onFinish }) {
     }
   }, [onFinish]);
 
+  // Reset step index when viewId changes
+  React.useEffect(() => {
+    setStepIndex(0);
+  }, [viewId]);
+
+  if (!steps.length) return null;
+
   return (
     <Joyride
-      steps={STEPS}
+      steps={steps}
       run={run}
       stepIndex={stepIndex}
       continuous

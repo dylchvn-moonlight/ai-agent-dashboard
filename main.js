@@ -489,21 +489,19 @@ ipcMain.handle('artifact:open-folder', async () => {
 
 // --- Terminal IPC Handlers ---
 
-ipcMain.handle('terminal:spawn', async (_event, { id, shell, cwd }) => {
+ipcMain.handle('terminal:spawn', async (_event, { id, shell, cwd, cols, rows }) => {
   try {
-    const result = terminalManager.spawn(id, { shell, cwd });
+    const result = terminalManager.spawn(id, { shell, cwd, cols, rows });
     if (!result.success) return result;
 
     const proc = terminalManager.getProcess(id);
     if (proc) {
-      proc.stdout.on('data', (data) => {
-        mainWindow?.webContents?.send('terminal:data', { id, data: data.toString() });
+      // node-pty: single combined stream (stdout+stderr merged, like a real terminal)
+      proc.onData((data) => {
+        mainWindow?.webContents?.send('terminal:data', { id, data });
       });
-      proc.stderr.on('data', (data) => {
-        mainWindow?.webContents?.send('terminal:data', { id, data: data.toString() });
-      });
-      proc.on('exit', (code) => {
-        mainWindow?.webContents?.send('terminal:exit', { id, code });
+      proc.onExit(({ exitCode }) => {
+        mainWindow?.webContents?.send('terminal:exit', { id, code: exitCode });
       });
     }
 

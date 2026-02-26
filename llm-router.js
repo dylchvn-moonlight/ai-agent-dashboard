@@ -95,7 +95,8 @@ class LLMRouter {
   // OpenAI (fetch to REST API)
   // ---------------------------------------------------------------------------
   async _callOpenAI(config, input, credentials, start) {
-    if (!credentials.openaiKey) {
+    const apiKey = credentials['openai-api-key'];
+    if (!apiKey) {
       throw new Error('OpenAI API key is not configured.');
     }
 
@@ -116,7 +117,7 @@ class LLMRouter {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${credentials.openaiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
           model,
@@ -157,7 +158,7 @@ class LLMRouter {
   // Local / self-hosted (OpenAI-compatible endpoint)
   // ---------------------------------------------------------------------------
   async _callLocal(config, input, credentials, start) {
-    const endpoint = credentials.localEndpoint || 'http://localhost:1234';
+    const endpoint = credentials['local-endpoint-url'] || 'http://localhost:1234';
     const url = `${endpoint.replace(/\/+$/, '')}/v1/chat/completions`;
 
     const model = config.model || 'local-model';

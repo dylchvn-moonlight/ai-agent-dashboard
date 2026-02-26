@@ -5,9 +5,6 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import useTerminalStore from '@/stores/terminal-store';
 
-/**
- * xterm.js theme matching the app's dark glassmorphism UI (variables.css).
- */
 const TERMINAL_THEME = {
   background: '#0B0F1A',
   foreground: '#E2E8F0',
@@ -34,30 +31,28 @@ const TERMINAL_THEME = {
 };
 
 /**
- * TerminalInstance — xterm.js wrapper with a client-side line buffer.
+ * TerminalInstance — xterm.js wrapper with client-side line buffer.
  *
- * Without a PTY, child_process doesn't provide:
- *   - Local echo (seeing what you type)
- *   - Line editing (backspace, arrow keys)
- *   - Prompt display
- *   - \r → \n translation (xterm sends \r for Enter)
- *   - Signal handling (Ctrl+C)
+ * Since we use child_process (no PTY), the shell doesn't echo keystrokes
+ * or handle line editing. This component provides:
+ *   - Local echo (see what you type)
+ *   - Line editing (backspace, arrows, home/end, delete)
+ *   - \r → \n translation (xterm sends \r, stdin needs \n)
+ *   - Command history (up/down arrows)
+ *   - Ctrl+C / Ctrl+L
  *
- * This component implements a mini-readline that handles all of the above,
- * flushing complete lines to the shell's stdin on Enter.
+ * The shell (cmd.exe / bash) provides its own prompt in its stdout stream,
+ * so we do NOT inject an additional prompt — we just pass output through.
  */
 export default function TerminalInstance({ sessionId, visible }) {
   const containerRef = useRef(null);
   const termRef = useRef(null);
   const fitRef = useRef(null);
   const cleanupRef = useRef([]);
-  // Line buffer state — kept in refs so the onData callback always sees current values
   const lineRef = useRef('');
   const cursorPosRef = useRef(0);
   const historyRef = useRef([]);
   const historyIndexRef = useRef(-1);
-  // Track whether we're waiting for command output (suppress echo during output)
-  const awaitingOutputRef = useRef(false);
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -83,69 +78,41 @@ export default function TerminalInstance({ sessionId, visible }) {
     termRef.current = term;
     fitRef.current = fitAddon;
 
-    // Initial fit
     requestAnimationFrame(() => {
       try { fitAddon.fit(); } catch { /* container not ready */ }
     });
 
-    /** Rewrite the current line on screen (used after edits like backspace, arrow keys) */
+    /** Rewrite the current input line (after backspace, arrow keys, history) */
     function redrawLine() {
       const line = lineRef.current;
       const pos = cursorPosRef.current;
-      // Move cursor to start of input, clear to end of line, rewrite, reposition
+      // Save cursor, move to start of input area, clear line, write input, restore position
+      // We need to know where the prompt ends — track it
       term.write('\x1b[2K\r');
-      writePrompt();
+      // Re-print the shell prompt that was on this line (we can't — it's gone)
+      // So just write the user input from column 0
       term.write(line);
-      // Move cursor to correct position
       const backSteps = line.length - pos;
       if (backSteps > 0) {
         term.write(`\x1b[${backSteps}D`);
       }
     }
 
-    /** Write the shell prompt indicator */
-    function writePrompt() {
-      term.write('\x1b[38;5;39m> \x1b[0m');
-    }
-
-    /** Show initial prompt */
-    function showReady() {
-      term.writeln('\x1b[38;5;245m— Shell session started —\x1b[0m');
-      term.writeln('\x1b[38;5;245mType commands and press Enter to execute.\x1b[0m');
-      writePrompt();
-    }
-
-    // Spawn the shell process via IPC
+    // Spawn the shell
     window.electronAPI?.terminalSpawn({ id: sessionId }).then((result) => {
       if (!result?.success) {
         term.writeln(`\x1b[31mFailed to start shell: ${result?.error || 'Unknown error'}\x1b[0m`);
-      } else {
-        showReady();
       }
     });
 
-    // Listen for shell output — write to xterm, then re-show prompt
+    // Shell output → xterm (pass through directly, no extra prompts)
     const cleanupData = window.electronAPI?.onTerminalData((data) => {
       if (data.id === sessionId) {
-        awaitingOutputRef.current = false;
         term.write(data.data);
-        // If the output doesn't end with a newline, add one
-        if (!data.data.endsWith('\n') && !data.data.endsWith('\r')) {
-          term.write('\r\n');
-        }
-        // Re-show prompt after output, with any in-progress line
-        writePrompt();
-        if (lineRef.current.length > 0) {
-          term.write(lineRef.current);
-          const backSteps = lineRef.current.length - cursorPosRef.current;
-          if (backSteps > 0) {
-            term.write(`\x1b[${backSteps}D`);
-          }
-        }
       }
     });
 
-    // Listen for shell exit
+    // Shell exit
     const cleanupExit = window.electronAPI?.onTerminalExit((data) => {
       if (data.id === sessionId) {
         term.writeln(`\r\n\x1b[38;5;245m— Process exited (code ${data.code ?? '?'}) —\x1b[0m`);
@@ -153,16 +120,10 @@ export default function TerminalInstance({ sessionId, visible }) {
       }
     });
 
-    /**
-     * Handle keyboard input from xterm.
-     * Implements line editing (local echo, backspace, arrows, history, Ctrl+C).
-     */
+    /** Handle keyboard input — local echo + line buffer */
     const onDataDisposable = term.onData((data) => {
-      // If process is dead, ignore input
       const session = useTerminalStore.getState().sessions.find(s => s.id === sessionId);
       if (session && !session.alive) return;
-
-      const code = data.charCodeAt(0);
 
       // --- Enter (\r) ---
       if (data === '\r') {
@@ -175,35 +136,34 @@ export default function TerminalInstance({ sessionId, visible }) {
         historyIndexRef.current = -1;
         lineRef.current = '';
         cursorPosRef.current = 0;
-        awaitingOutputRef.current = true;
-        // Send to shell with newline
         window.electronAPI?.terminalWrite({ id: sessionId, data: line + '\n' });
         return;
       }
 
-      // --- Backspace (\x7f) ---
+      // --- Backspace (\x7f or \b) ---
       if (data === '\x7f' || data === '\b') {
         if (cursorPosRef.current > 0) {
           const line = lineRef.current;
           const pos = cursorPosRef.current;
           lineRef.current = line.slice(0, pos - 1) + line.slice(pos);
           cursorPosRef.current = pos - 1;
-          redrawLine();
+          // Visual: move back, delete char, rewrite rest
+          term.write('\b \b');
+          const tail = lineRef.current.slice(cursorPosRef.current);
+          if (tail.length > 0) {
+            term.write(tail + ' ');
+            term.write(`\x1b[${tail.length + 1}D`);
+          }
         }
         return;
       }
 
       // --- Ctrl+C ---
       if (data === '\x03') {
-        // If there's a running command, send SIGINT equivalent
-        if (awaitingOutputRef.current) {
-          window.electronAPI?.terminalWrite({ id: sessionId, data: '\x03' });
-        }
-        // Clear current line
-        term.write('^C\r\n');
+        window.electronAPI?.terminalWrite({ id: sessionId, data: '\x03' });
         lineRef.current = '';
         cursorPosRef.current = 0;
-        writePrompt();
+        term.write('^C\r\n');
         return;
       }
 
@@ -212,16 +172,22 @@ export default function TerminalInstance({ sessionId, visible }) {
         term.clear();
         lineRef.current = '';
         cursorPosRef.current = 0;
-        writePrompt();
         return;
       }
 
-      // --- Escape sequences (arrow keys, etc.) ---
-      if (data.startsWith('\x1b[') || data.startsWith('\x1b')) {
-        // Up arrow — history previous
+      // --- Escape sequences (arrows, home, end, delete) ---
+      if (data.startsWith('\x1b')) {
+        // Up arrow — previous history
         if (data === '\x1b[A') {
           const history = historyRef.current;
           if (history.length === 0) return;
+          // Clear current input visually
+          const oldLen = lineRef.current.length;
+          if (oldLen > 0) {
+            term.write(`\x1b[${cursorPosRef.current}D`);
+            term.write(' '.repeat(oldLen));
+            term.write(`\x1b[${oldLen}D`);
+          }
           if (historyIndexRef.current === -1) {
             historyIndexRef.current = history.length - 1;
           } else if (historyIndexRef.current > 0) {
@@ -229,14 +195,20 @@ export default function TerminalInstance({ sessionId, visible }) {
           }
           lineRef.current = history[historyIndexRef.current] || '';
           cursorPosRef.current = lineRef.current.length;
-          redrawLine();
+          term.write(lineRef.current);
           return;
         }
 
-        // Down arrow — history next
+        // Down arrow — next history
         if (data === '\x1b[B') {
-          const history = historyRef.current;
           if (historyIndexRef.current === -1) return;
+          const history = historyRef.current;
+          const oldLen = lineRef.current.length;
+          if (oldLen > 0) {
+            term.write(`\x1b[${cursorPosRef.current}D`);
+            term.write(' '.repeat(oldLen));
+            term.write(`\x1b[${oldLen}D`);
+          }
           if (historyIndexRef.current < history.length - 1) {
             historyIndexRef.current++;
             lineRef.current = history[historyIndexRef.current] || '';
@@ -245,7 +217,7 @@ export default function TerminalInstance({ sessionId, visible }) {
             lineRef.current = '';
           }
           cursorPosRef.current = lineRef.current.length;
-          redrawLine();
+          term.write(lineRef.current);
           return;
         }
 
@@ -253,7 +225,7 @@ export default function TerminalInstance({ sessionId, visible }) {
         if (data === '\x1b[D') {
           if (cursorPosRef.current > 0) {
             cursorPosRef.current--;
-            term.write('\x1b[D');
+            term.write(data);
           }
           return;
         }
@@ -262,52 +234,55 @@ export default function TerminalInstance({ sessionId, visible }) {
         if (data === '\x1b[C') {
           if (cursorPosRef.current < lineRef.current.length) {
             cursorPosRef.current++;
-            term.write('\x1b[C');
+            term.write(data);
           }
           return;
         }
 
         // Home
         if (data === '\x1b[H' || data === '\x1b[1~') {
-          cursorPosRef.current = 0;
-          redrawLine();
+          if (cursorPosRef.current > 0) {
+            term.write(`\x1b[${cursorPosRef.current}D`);
+            cursorPosRef.current = 0;
+          }
           return;
         }
 
         // End
         if (data === '\x1b[F' || data === '\x1b[4~') {
-          cursorPosRef.current = lineRef.current.length;
-          redrawLine();
+          const move = lineRef.current.length - cursorPosRef.current;
+          if (move > 0) {
+            term.write(`\x1b[${move}C`);
+            cursorPosRef.current = lineRef.current.length;
+          }
           return;
         }
 
         // Delete key
         if (data === '\x1b[3~') {
-          const line = lineRef.current;
           const pos = cursorPosRef.current;
-          if (pos < line.length) {
-            lineRef.current = line.slice(0, pos) + line.slice(pos + 1);
-            redrawLine();
+          if (pos < lineRef.current.length) {
+            lineRef.current = lineRef.current.slice(0, pos) + lineRef.current.slice(pos + 1);
+            const tail = lineRef.current.slice(pos);
+            term.write(tail + ' ');
+            term.write(`\x1b[${tail.length + 1}D`);
           }
           return;
         }
 
-        // Ignore other escape sequences
-        return;
+        return; // ignore other escape sequences
       }
 
       // --- Regular printable characters ---
-      if (code >= 32) {
-        const line = lineRef.current;
+      if (data.charCodeAt(0) >= 32) {
         const pos = cursorPosRef.current;
-        lineRef.current = line.slice(0, pos) + data + line.slice(pos);
+        lineRef.current = lineRef.current.slice(0, pos) + data + lineRef.current.slice(pos);
         cursorPosRef.current = pos + data.length;
-        if (pos === line.length) {
-          // Appending at end — just echo
-          term.write(data);
-        } else {
-          // Inserting in middle — redraw
-          redrawLine();
+        // Echo the character + rewrite any text to the right
+        const tail = lineRef.current.slice(cursorPosRef.current);
+        term.write(data + tail);
+        if (tail.length > 0) {
+          term.write(`\x1b[${tail.length}D`);
         }
       }
     });
@@ -316,8 +291,7 @@ export default function TerminalInstance({ sessionId, visible }) {
     const resizeObserver = new ResizeObserver(() => {
       try {
         fitAddon.fit();
-        const dims = { cols: term.cols, rows: term.rows };
-        window.electronAPI?.terminalResize({ id: sessionId, ...dims });
+        window.electronAPI?.terminalResize({ id: sessionId, cols: term.cols, rows: term.rows });
       } catch { /* ignore */ }
     });
     resizeObserver.observe(containerRef.current);
@@ -335,7 +309,6 @@ export default function TerminalInstance({ sessionId, visible }) {
     };
   }, [sessionId]);
 
-  // Re-fit when visibility changes
   useEffect(() => {
     if (visible && fitRef.current) {
       requestAnimationFrame(() => {

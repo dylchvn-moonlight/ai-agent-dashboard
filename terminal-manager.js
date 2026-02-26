@@ -19,11 +19,12 @@ class TerminalManager {
 
   /**
    * Detect the default shell for the current platform.
-   * Prefers PowerShell on Windows for better output, cmd.exe as fallback.
+   * Uses cmd.exe on Windows — it handles piped stdin line-by-line reliably
+   * without a PTY. Users can type `powershell` to switch if needed.
    */
   getDefaultShell() {
     if (process.platform === 'win32') {
-      return 'powershell.exe';
+      return process.env.COMSPEC || 'cmd.exe';
     }
     return process.env.SHELL || '/bin/bash';
   }
@@ -51,14 +52,12 @@ class TerminalManager {
     const shellCmd = shell || this.getDefaultShell();
     const workDir = cwd || this.getDefaultCwd();
 
-    // Shell-specific args
+    // Shell-specific args for piped stdin mode
     const args = [];
-    if (shellCmd.includes('powershell') || shellCmd.includes('pwsh')) {
-      // -NoLogo: suppress banner, -NoProfile: faster startup, -NonInteractive not used
-      // because we still want to send commands via stdin
-      args.push('-NoLogo', '-NoExit', '-Command', '-');
-    } else if (shellCmd.includes('cmd')) {
-      args.push('/Q'); // echo off — we handle echo in renderer
+    if (shellCmd.includes('cmd')) {
+      args.push('/Q', '/K'); // /Q = echo off (renderer handles echo), /K = stay alive
+    } else if (shellCmd.includes('powershell') || shellCmd.includes('pwsh')) {
+      args.push('-NoLogo', '-NoProfile');
     }
     // bash/zsh: no special args needed for piped stdin
 

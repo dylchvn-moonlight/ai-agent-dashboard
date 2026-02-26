@@ -278,7 +278,7 @@ class LLMRouter {
     };
   }
   // ---------------------------------------------------------------------------
-  // Kimi / Moonshot AI (OpenAI-compatible)
+  // Kimi / Moonshot AI (OpenAI-compatible, with optional function calling)
   // ---------------------------------------------------------------------------
   async _callKimi(config, input, credentials, start) {
     const apiKey = credentials['kimi-api-key'];
@@ -298,6 +298,19 @@ class LLMRouter {
     }
     messages.push({ role: 'user', content: input });
 
+    const body = {
+      model,
+      messages,
+      max_tokens: maxTokens,
+      temperature,
+    };
+
+    // Add tool definitions if provided (Kimi 2.5 function calling)
+    if (config.tools && config.tools.length > 0) {
+      body.tools = config.tools;
+      body.tool_choice = config.toolChoice || 'auto';
+    }
+
     const response = await fetch(
       'https://api.moonshot.ai/v1/chat/completions',
       {
@@ -306,12 +319,7 @@ class LLMRouter {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({
-          model,
-          messages,
-          max_tokens: maxTokens,
-          temperature,
-        }),
+        body: JSON.stringify(body),
       }
     );
 
@@ -324,21 +332,28 @@ class LLMRouter {
 
     const data = await response.json();
 
-    const text =
-      data.choices && data.choices.length > 0
-        ? data.choices[0].message?.content || ''
-        : '';
+    const choice = data.choices && data.choices.length > 0 ? data.choices[0] : null;
+    const text = choice?.message?.content || '';
+    const toolCalls = choice?.message?.tool_calls || null;
 
     const tokens = {
       input: data.usage?.prompt_tokens || 0,
       output: data.usage?.completion_tokens || 0,
     };
 
-    return {
+    const result = {
       text,
       tokens,
       latency: Date.now() - start,
     };
+
+    // If Kimi returned tool calls, include them in the result
+    if (toolCalls && toolCalls.length > 0) {
+      result.toolCalls = toolCalls;
+      result.finishReason = choice?.finish_reason || 'tool_calls';
+    }
+
+    return result;
   }
 }
 

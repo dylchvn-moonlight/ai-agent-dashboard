@@ -100,6 +100,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   sendEmail: (message) => ipcRenderer.invoke('email:send', message),
   testEmailConnection: () => ipcRenderer.invoke('email:test'),
 
+  // n8n API proxy
+  n8nRequest: (method, path, body) => ipcRenderer.invoke('n8n:request', method, path, body),
+  n8nTestConnection: () => ipcRenderer.invoke('n8n:test-connection'),
+
   // Push events (main → renderer)
   onExecutionStep: (callback) => {
     const handler = (_event, data) => callback(data);

@@ -1,5 +1,5 @@
-import React, { useEffect } from 'react';
-import { Plus, X, TerminalSquare, RotateCcw } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { Plus, X, TerminalSquare, RotateCcw, Workflow, ChevronDown } from 'lucide-react';
 import useTerminalStore from '@/stores/terminal-store';
 import TerminalInstance from '@/components/TerminalInstance';
 
@@ -27,12 +27,29 @@ export default function Terminal() {
     removeSession(id);
   };
 
+  const [showN8nBar, setShowN8nBar] = useState(false);
+
   const handleRestart = (id) => {
     // Remove old session and create a fresh one
     window.electronAPI?.terminalKill({ id });
     removeSession(id);
     createSession();
   };
+
+  const sendToTerminal = (cmd) => {
+    if (activeSessionId) {
+      window.electronAPI?.terminalWrite({ id: activeSessionId, data: cmd + '\n' });
+    }
+  };
+
+  const N8N_COMMANDS = [
+    { label: 'List Workflows', cmd: 'curl -s -H "X-N8N-API-KEY: $N8N_API_KEY" "$N8N_URL/api/v1/workflows" | jq .data[].name' },
+    { label: 'List Credentials', cmd: 'curl -s -H "X-N8N-API-KEY: $N8N_API_KEY" "$N8N_URL/api/v1/credentials" | jq .data[].name' },
+    { label: 'List Executions', cmd: 'curl -s -H "X-N8N-API-KEY: $N8N_API_KEY" "$N8N_URL/api/v1/executions?limit=10" | jq .data[]' },
+    { label: 'Health Check', cmd: 'curl -s "$N8N_URL/healthz" && echo " ✓ n8n is running"' },
+    { label: 'Start n8n (Docker)', cmd: 'docker start n8n 2>/dev/null || echo "n8n container not found"' },
+    { label: 'n8n Logs', cmd: 'docker logs --tail 50 n8n 2>/dev/null || echo "n8n container not found"' },
+  ];
 
   return (
     <div className="flex flex-col h-full bg-[var(--bg)]">
@@ -86,6 +103,31 @@ export default function Terminal() {
         >
           <Plus size={15} />
         </button>
+      </div>
+
+      {/* n8n Quick Actions Bar */}
+      <div className="flex items-center gap-1.5 px-2 py-1.5 border-b border-[var(--glassBd)] bg-[var(--sf)]/40">
+        <button
+          onClick={() => setShowN8nBar(!showN8nBar)}
+          className={`flex items-center gap-1.5 px-2.5 py-1 text-[10px] font-medium rounded-md transition-colors ${
+            showN8nBar
+              ? 'bg-orange-500/15 text-orange-400 border border-orange-500/30'
+              : 'text-[var(--dm)] hover:text-[var(--sb)] hover:bg-white/5 border border-transparent'
+          }`}
+        >
+          <Workflow size={11} />
+          n8n
+          <ChevronDown size={10} className={`transition-transform ${showN8nBar ? 'rotate-180' : ''}`} />
+        </button>
+        {showN8nBar && N8N_COMMANDS.map((item) => (
+          <button
+            key={item.label}
+            onClick={() => sendToTerminal(item.cmd)}
+            className="px-2 py-1 text-[10px] font-medium text-[var(--dm)] hover:text-orange-400 hover:bg-orange-500/10 rounded-md transition-colors whitespace-nowrap"
+          >
+            {item.label}
+          </button>
+        ))}
       </div>
 
       {/* Terminal content area */}

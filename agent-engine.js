@@ -536,6 +536,12 @@ class AgentEngine {
       maxTokens: nodeData.maxTokens || settings.maxTokens || 4096,
     };
 
+    // Pass Kimi tool definitions when provider is kimi and tools are enabled
+    if (provider === 'kimi' && nodeData.kimiTools && nodeData.kimiTools.length > 0) {
+      config.tools = nodeData.kimiTools;
+      config.toolChoice = nodeData.kimiToolChoice || 'auto';
+    }
+
     const result = await this.llmRouter.call(
       provider,
       config,
@@ -543,11 +549,18 @@ class AgentEngine {
       credentials
     );
 
-    return {
+    const output = {
       __engineResult: true,
       output: result.text,
       tokens: result.tokens,
     };
+
+    // Include tool calls in output if Kimi returned them
+    if (result.toolCalls) {
+      output.toolCalls = result.toolCalls;
+    }
+
+    return output;
   }
 
   /** 4. MemoryNode — store/retrieve conversation history */

@@ -3,6 +3,8 @@ import { Play, DollarSign, Clock, MoreVertical, ExternalLink, Trash2 } from 'luc
 import useUiStore from '@/stores/ui-store';
 import useAgentStore from '@/stores/agent-store';
 import { truncate } from '@/lib/utils';
+import { INDUSTRY_PROFILES } from '@/lib/industry-profiles';
+import { ROLE_TEMPLATES } from '@/lib/role-templates';
 
 const STATUS_STYLES = {
   draft: { label: 'Draft', bg: 'bg-gray-500/15', text: 'text-gray-400', dot: 'bg-gray-400' },
@@ -122,6 +124,24 @@ export default function AgentCard({ agent }) {
         <p className="text-xs text-[var(--dm)] leading-relaxed min-h-[2rem]">
           {truncate(agent.description, 80) || 'No description'}
         </p>
+
+        {/* Industry / Role Tags */}
+        {(agent.agentConfig?.industry || agent.agentConfig?.role) && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {agent.agentConfig.industry && INDUSTRY_PROFILES[agent.agentConfig.industry] && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-purple-500/15 text-purple-400">
+                {INDUSTRY_PROFILES[agent.agentConfig.industry].icon}{' '}
+                {INDUSTRY_PROFILES[agent.agentConfig.industry].label}
+              </span>
+            )}
+            {agent.agentConfig.role && ROLE_TEMPLATES[agent.agentConfig.role] && (
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-cyan-500/15 text-cyan-400">
+                {ROLE_TEMPLATES[agent.agentConfig.role].icon}{' '}
+                {ROLE_TEMPLATES[agent.agentConfig.role].label}
+              </span>
+            )}
+          </div>
+        )}
 
         {/* Divider */}
         <div className="border-t border-[var(--glassBd)]" />

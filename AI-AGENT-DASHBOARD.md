@@ -1,6 +1,6 @@
 # AI Agent UI Dashboard — Product Blueprint & Build Guide
 
-> **Version:** 0.4.0 | **Created:** 2026-02-24 | **Updated:** 2026-02-25
+> **Version:** 0.5.0 | **Created:** 2026-02-24 | **Updated:** 2026-02-27
 > **Single source of truth** for building, maintaining, and extending the AI Agent Dashboard.
 > **Master guide:** [`PROJECT-FOUNDATION.md`](../../PROJECT-FOUNDATION.md) — covers all project types, plugins, and deployment.
 
@@ -1051,6 +1051,58 @@ PUSH EVENTS (main → renderer)
 ---
 
 ## 15. Changelog
+
+### v0.5.0 (2026-02-27) — n8n Integration & Agent Creator Config
+
+**Agent Creator Config System**
+- New `agentConfig` field on every agent: role, industry, business details, persona, guardrails, tools, knowledge sources, deployment channels
+- `src/lib/agent-config.js` — Schema enums, defaults, validator
+- `src/lib/industry-profiles.js` — 13 industry profiles (real_estate → custom) with terminology, FAQs, compliance rules
+- `src/lib/role-templates.js` — 10 role templates (receptionist → review_manager) with goals, KPIs, default tools
+- `src/lib/tool-mappings.js` — 15 tool→n8n node type mappings
+- `src/lib/knowledge-sources.js` — 8 knowledge source types with config fields
+- `src/lib/persona-presets.js` — 5 tone templates, default guardrails, smart defaults per industry+role combo
+- `src/stores/agent-store.js` — Extended agent schema with full `agentConfig` nested structure
+
+**Agent Config UI**
+- `src/components/AgentConfigPanel.jsx` — 420px tabbed config panel (6 tabs: Industry & Role, Persona, Tools, Guardrails, Knowledge, Preview)
+- "Configure" button in Agent Builder top bar with toggle state highlight
+- Panel/NodeConfig are mutually exclusive (selecting a node closes config, opening config deselects nodes)
+- Smart defaults: selecting industry+role auto-populates tools, tone, and knowledge sources
+- `src/components/SystemPromptPreview.jsx` — Live system prompt preview with word/char count and copy button
+- `src/components/AgentCard.jsx` — Industry/role badge tags on Dashboard agent cards (purple for industry, cyan for role)
+
+**System Prompt Generator**
+- `src/services/prompt-generator.js` — Generates complete system prompts from AgentConfig
+- Sections: Identity, Goals, Communication Style, Business Info, Industry Knowledge, Tools, Knowledge Sources, Guardrails, Response Format
+- Resolves string-or-object for industry/role lookups
+
+**n8n Workflow Generator**
+- `src/services/n8n-workflow-generator.js` — Converts AgentConfig → complete n8n workflow JSON
+- 4 trigger types: chat, webhook, schedule, form
+- AI Agent node + LLM sub-node + Memory sub-node + tool sub-nodes
+- Connection types: main, ai_languageModel, ai_memory, ai_tool
+- `validateWorkflow()` for pre-deployment checks
+
+**n8n REST API Integration**
+- `src/services/n8n-service.js` — Renderer-side API client (all calls proxy through IPC)
+- `src/stores/n8n-store.js` — Zustand store for n8n state (workflows, credentials, connection status)
+- `main.js` — 2 new IPC handlers: `n8n:request` (proxied API calls), `n8n:test-connection`
+- `preload.js` — 2 new bridge methods: `n8nRequest`, `n8nTestConnection`
+- Settings.jsx — "n8n Integration" section with API URL, API key, Save, Test Connection
+
+**Terminal n8n Quick Actions**
+- Collapsible n8n action bar in Terminal view with 6 quick commands
+- Commands: List Workflows, List Credentials, List Executions, Health Check, Start n8n (Docker), n8n Logs
+- Uses `$N8N_URL` and `$N8N_API_KEY` environment variables
+
+**Kimi 2.5 Function Calling**
+- `src/lib/kimi-tools.js` — 12 tool definitions for agent creation, prompt generation, n8n management
+- `KIMI_AGENT_CREATOR_SYSTEM_PROMPT` — Master system prompt for Kimi-powered agent creation
+- `llm-router.js` — Enhanced `_callKimi()` with `tools` and `tool_choice` support, returns `toolCalls` in result
+- `agent-engine.js` — `_execLLM()` passes Kimi tools when `provider === 'kimi'` and `kimiTools` are configured
+
+---
 
 ### v0.4.0 (2026-02-25) — Artifact & Action System
 

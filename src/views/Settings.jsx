@@ -915,6 +915,14 @@ export default function Settings() {
   const [smtpTestStatus, setSmtpTestStatus] = useState(null); // null | 'testing' | 'success' | 'error'
   const [smtpSaved, setSmtpSaved] = useState(false);
 
+  /* n8n integration state */
+  const [n8nUrl, setN8nUrl] = useState('');
+  const [n8nKey, setN8nKey] = useState('');
+  const [n8nKeyVisible, setN8nKeyVisible] = useState(false);
+  const [n8nTestStatus, setN8nTestStatus] = useState(null); // null | 'testing' | 'success' | 'error'
+  const [n8nSaved, setN8nSaved] = useState(false);
+  const [n8nTestError, setN8nTestError] = useState('');
+
   /* App version */
   const [aboutVersion, setAboutVersion] = useState('…');
   useEffect(() => {
@@ -941,6 +949,12 @@ export default function Settings() {
       } catch {
         /* defaults are fine */
       }
+
+      // Load n8n credentials
+      const n8nUrlVal = await window.electronAPI?.loadCredential('n8n-api-url');
+      const n8nKeyVal = await window.electronAPI?.loadCredential('n8n-api-key');
+      if (!cancelled && n8nUrlVal) setN8nUrl(n8nUrlVal);
+      if (!cancelled && n8nKeyVal) setN8nKey(n8nKeyVal);
 
       // Load SMTP credentials
       const smtpFields = ['smtp-host', 'smtp-port', 'smtp-secure', 'smtp-user', 'smtp-pass', 'smtp-from-name', 'smtp-from-email'];
@@ -1252,6 +1266,104 @@ export default function Settings() {
             <p className="text-[10px] text-[var(--dm)]">
               For Gmail, use an App Password (not your regular password). Enable 2FA in Google settings first.
             </p>
+          </div>
+        </Section>
+
+        {/* ── n8n Integration ── */}
+        <Section icon={Link} title="n8n Integration">
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[var(--sb)]">n8n API URL</label>
+              <input
+                type="text"
+                value={n8nUrl}
+                onChange={(e) => setN8nUrl(e.target.value)}
+                placeholder="http://localhost:5678"
+                className="w-full bg-[var(--bg)] border border-[var(--glassBd)] rounded-lg text-xs text-[var(--tx)] px-3 py-2 focus:outline-none focus:border-[var(--blue)] transition-colors"
+              />
+              <p className="text-[10px] text-[var(--dm)]">
+                Self-hosted: http://localhost:5678 — Cloud: https://your-instance.app.n8n.cloud
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-[var(--sb)]">API Key</label>
+              <div className="relative">
+                <input
+                  type={n8nKeyVisible ? 'text' : 'password'}
+                  value={n8nKey}
+                  onChange={(e) => setN8nKey(e.target.value)}
+                  placeholder="n8n API key"
+                  className="w-full bg-[var(--bg)] border border-[var(--glassBd)] rounded-lg text-xs text-[var(--tx)] px-3 py-2 pr-8 focus:outline-none focus:border-[var(--blue)] transition-colors"
+                />
+                <button
+                  type="button"
+                  onClick={() => setN8nKeyVisible((v) => !v)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[var(--dm)] hover:text-[var(--sb)] transition-colors"
+                >
+                  {n8nKeyVisible ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+              <p className="text-[10px] text-[var(--dm)]">
+                Generate at: n8n Settings &gt; n8n API &gt; Create API Key
+              </p>
+            </div>
+
+            <div className="flex items-center gap-2 pt-1">
+              <button
+                onClick={async () => {
+                  if (!n8nUrl.trim() || !n8nKey.trim()) return;
+                  // Save first
+                  await window.electronAPI?.saveCredential('n8n-api-url', n8nUrl.trim());
+                  await window.electronAPI?.saveCredential('n8n-api-key', n8nKey.trim());
+                  setN8nSaved(true);
+                  setTimeout(() => setN8nSaved(false), 2000);
+                }}
+                disabled={!n8nUrl.trim() || !n8nKey.trim()}
+                className="flex items-center gap-1.5 px-4 py-2 bg-[var(--blue)] hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed text-white text-xs font-medium rounded-lg transition-colors"
+              >
+                {n8nSaved ? <Check size={13} /> : <Save size={13} />}
+                {n8nSaved ? 'Saved' : 'Save'}
+              </button>
+              <button
+                onClick={async () => {
+                  if (!n8nUrl.trim() || !n8nKey.trim()) return;
+                  setN8nTestStatus('testing');
+                  setN8nTestError('');
+                  // Save before testing
+                  await window.electronAPI?.saveCredential('n8n-api-url', n8nUrl.trim());
+                  await window.electronAPI?.saveCredential('n8n-api-key', n8nKey.trim());
+                  const result = await window.electronAPI?.n8nTestConnection();
+                  if (result?.success) {
+                    setN8nTestStatus('success');
+                  } else {
+                    setN8nTestStatus('error');
+                    setN8nTestError(result?.error || 'Connection failed');
+                  }
+                  setTimeout(() => setN8nTestStatus(null), 4000);
+                }}
+                disabled={!n8nUrl.trim() || !n8nKey.trim() || n8nTestStatus === 'testing'}
+                className="flex items-center gap-1.5 px-4 py-2 border border-[var(--glassBd)] hover:border-[var(--blue)] disabled:opacity-40 disabled:cursor-not-allowed text-xs text-[var(--tx)] rounded-lg transition-colors"
+              >
+                {n8nTestStatus === 'testing' ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : n8nTestStatus === 'success' ? (
+                  <Check size={13} className="text-[var(--green)]" />
+                ) : n8nTestStatus === 'error' ? (
+                  <AlertCircle size={13} className="text-[var(--red)]" />
+                ) : (
+                  <Plug size={13} />
+                )}
+                {n8nTestStatus === 'testing' ? 'Testing...' : n8nTestStatus === 'success' ? 'Connected!' : n8nTestStatus === 'error' ? 'Failed' : 'Test Connection'}
+              </button>
+            </div>
+
+            {n8nTestStatus === 'success' && (
+              <p className="text-[10px] text-[var(--green)]">Successfully connected to n8n instance.</p>
+            )}
+            {n8nTestStatus === 'error' && n8nTestError && (
+              <p className="text-[10px] text-[var(--red)]">{n8nTestError}</p>
+            )}
           </div>
         </Section>
 

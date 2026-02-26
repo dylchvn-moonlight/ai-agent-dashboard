@@ -6,7 +6,7 @@ import {
   MiniMap,
 } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
-import { Play, Save, Workflow, Loader2, Square, X, LayoutTemplate } from 'lucide-react';
+import { Play, Save, Workflow, Loader2, Square, X, LayoutTemplate, Settings2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import useUiStore from '@/stores/ui-store';
@@ -18,6 +18,7 @@ import { nodeTypes } from '@/nodes';
 import NodePanel from '@/components/NodePanel';
 import NodeConfig from '@/components/NodeConfig';
 import { AGENT_TEMPLATES } from '@/lib/agent-templates';
+import AgentConfigPanel from '@/components/AgentConfigPanel';
 
 export default function AgentBuilder() {
   const activeAgentId = useUiStore((s) => s.activeAgentId);
@@ -47,6 +48,7 @@ export default function AgentBuilder() {
   const [showRunDialog, setShowRunDialog] = React.useState(false);
   const [runInput, setRunInput] = React.useState('');
   const [showTemplates, setShowTemplates] = React.useState(false);
+  const [showConfigPanel, setShowConfigPanel] = React.useState(false);
 
   /* Load agent flow when active agent changes */
   const loadFlow = useFlowStore((s) => s.setNodes);
@@ -88,6 +90,7 @@ export default function AgentBuilder() {
   const onNodeClick = useCallback(
     (_event, node) => {
       setSelectedNode(node.id);
+      setShowConfigPanel(false);
     },
     [setSelectedNode]
   );
@@ -222,6 +225,20 @@ export default function AgentBuilder() {
               Templates
             </button>
             <button
+              onClick={() => {
+                setShowConfigPanel(!showConfigPanel);
+                if (!showConfigPanel) setSelectedNode(null);
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border rounded-lg transition-colors ${
+                showConfigPanel
+                  ? 'border-blue-500/50 bg-blue-500/10 text-blue-400'
+                  : 'border-[var(--glassBd)] hover:bg-white/5 text-[var(--sb)]'
+              }`}
+            >
+              <Settings2 size={13} />
+              Configure
+            </button>
+            <button
               onClick={handleSave}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-[var(--glassBd)] hover:bg-white/5 rounded-lg text-[var(--sb)] transition-colors"
             >
@@ -303,6 +320,15 @@ export default function AgentBuilder() {
 
       {/* Right: Node Config Panel (shown when a node is selected) */}
       {selectedNode && <NodeConfig node={selectedNode} />}
+
+      {/* Right: Agent Config Panel (shown when Configure is toggled) */}
+      {showConfigPanel && !selectedNode && (
+        <AgentConfigPanel
+          agentConfig={agent.agentConfig || {}}
+          onChange={(newConfig) => updateAgent(agent.id, { agentConfig: newConfig })}
+          onClose={() => setShowConfigPanel(false)}
+        />
+      )}
 
       {/* Run Input Dialog */}
       {showRunDialog && (

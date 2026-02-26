@@ -5,6 +5,11 @@ import { WebLinksAddon } from '@xterm/addon-web-links';
 import '@xterm/xterm/css/xterm.css';
 import useTerminalStore from '@/stores/terminal-store';
 
+// ── Font size limits for zoom ──────────────────────────────────────────
+const FONT_MIN = 8;
+const FONT_MAX = 28;
+const FONT_DEFAULT = 13;
+
 const TERMINAL_THEME = {
   background: '#0B0F1A',
   foreground: '#E2E8F0',
@@ -33,9 +38,21 @@ const TERMINAL_THEME = {
 /**
  * TerminalInstance — xterm.js wrapper backed by a real PTY.
  *
- * All keystrokes are forwarded directly to the PTY via IPC.
- * The PTY's line discipline handles echo, line editing, signals,
- * history, tab completion — everything a real terminal does.
+ * Keyboard shortcuts:
+ *   Ctrl+C          — copy selection (or SIGINT if no selection)
+ *   Ctrl+V          — paste from clipboard
+ *   Ctrl+Shift+C    — copy selection
+ *   Ctrl+Shift+V    — paste from clipboard
+ *   Ctrl+= / Ctrl+- — zoom in / out
+ *   Ctrl+0          — reset font size
+ *   Ctrl+Shift+K    — clear scrollback + screen
+ *   Ctrl+Shift+T    — new terminal tab
+ *   Ctrl+Home       — scroll to top
+ *   Ctrl+End        — scroll to bottom
+ *   Right-click     — paste from clipboard
+ *   Ctrl+Scroll     — zoom in/out
+ *   Middle-click    — paste from clipboard
+ *   Select text     — auto-copy to clipboard
  */
 export default function TerminalInstance({ sessionId, visible }) {
   const containerRef = useRef(null);
@@ -48,13 +65,14 @@ export default function TerminalInstance({ sessionId, visible }) {
 
     const term = new Terminal({
       fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-      fontSize: 13,
+      fontSize: FONT_DEFAULT,
       lineHeight: 1.4,
       theme: TERMINAL_THEME,
       cursorBlink: true,
       cursorStyle: 'bar',
-      scrollback: 5000,
+      scrollback: 10000,
       allowProposedApi: true,
+      rightClickSelectsWord: true,
     });
 
     const fitAddon = new FitAddon();
@@ -67,11 +85,37 @@ export default function TerminalInstance({ sessionId, visible }) {
     termRef.current = term;
     fitRef.current = fitAddon;
 
-    // Initial fit, then spawn with the measured dimensions
+    // ── Helpers ────────────────────────────────────────────────────────
+
+    const writeToPty = (data) => {
+      window.electronAPI?.terminalWrite({ id: sessionId, data });
+    };
+
+    const pasteFromClipboard = () => {
+      navigator.clipboard.readText().then((text) => {
+        if (text) writeToPty(text);
+      });
+    };
+
+    const copySelection = () => {
+      if (term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection());
+        term.clearSelection();
+      }
+    };
+
+    const setFontSize = (size) => {
+      const clamped = Math.max(FONT_MIN, Math.min(FONT_MAX, size));
+      term.options.fontSize = clamped;
+      try { fitAddon.fit(); } catch { /* ignore */ }
+      window.electronAPI?.terminalResize({ id: sessionId, cols: term.cols, rows: term.rows });
+    };
+
+    // ── Spawn shell ───────────────────────────────────────────────────
+
     requestAnimationFrame(() => {
       try { fitAddon.fit(); } catch { /* container not ready */ }
 
-      // Spawn the shell with actual terminal dimensions
       window.electronAPI?.terminalSpawn({
         id: sessionId,
         cols: term.cols,
@@ -83,14 +127,14 @@ export default function TerminalInstance({ sessionId, visible }) {
       });
     });
 
-    // Shell output → xterm (PTY sends combined stdout+stderr)
+    // ── PTY output → xterm ────────────────────────────────────────────
+
     const cleanupData = window.electronAPI?.onTerminalData((data) => {
       if (data.id === sessionId) {
         term.write(data.data);
       }
     });
 
-    // Shell exit
     const cleanupExit = window.electronAPI?.onTerminalExit((data) => {
       if (data.id === sessionId) {
         term.writeln(`\r\n\x1b[38;5;245m— Process exited (code ${data.code ?? '?'}) —\x1b[0m`);
@@ -98,27 +142,140 @@ export default function TerminalInstance({ sessionId, visible }) {
       }
     });
 
-    // Forward all keystrokes to PTY — no local processing needed
+    // ── Keyboard shortcuts ────────────────────────────────────────────
+
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type !== 'keydown') return true;
+      const ctrl = e.ctrlKey || e.metaKey;
+      const shift = e.shiftKey;
+
+      // Ctrl+C with selection → copy (without selection, ^C passes to PTY)
+      if (ctrl && e.key === 'c' && term.hasSelection()) {
+        copySelection();
+        return false;
+      }
+
+      // Ctrl+Shift+C → explicit copy
+      if (ctrl && shift && e.code === 'KeyC') {
+        copySelection();
+        return false;
+      }
+
+      // Ctrl+V or Ctrl+Shift+V → paste
+      if (ctrl && e.key === 'v') {
+        pasteFromClipboard();
+        return false;
+      }
+
+      // Ctrl+= or Ctrl+Shift+= → zoom in
+      if (ctrl && (e.key === '=' || e.key === '+')) {
+        setFontSize(term.options.fontSize + 1);
+        return false;
+      }
+
+      // Ctrl+- → zoom out
+      if (ctrl && e.key === '-') {
+        setFontSize(term.options.fontSize - 1);
+        return false;
+      }
+
+      // Ctrl+0 → reset zoom
+      if (ctrl && e.key === '0') {
+        setFontSize(FONT_DEFAULT);
+        return false;
+      }
+
+      // Ctrl+Shift+K → clear scrollback + screen
+      if (ctrl && shift && e.code === 'KeyK') {
+        term.clear();
+        return false;
+      }
+
+      // Ctrl+Shift+T → new terminal tab
+      if (ctrl && shift && e.code === 'KeyT') {
+        useTerminalStore.getState().createSession();
+        return false;
+      }
+
+      // Ctrl+Home → scroll to top
+      if (ctrl && e.key === 'Home') {
+        term.scrollToTop();
+        return false;
+      }
+
+      // Ctrl+End → scroll to bottom
+      if (ctrl && e.key === 'End') {
+        term.scrollToBottom();
+        return false;
+      }
+
+      return true;
+    });
+
+    // ── Forward keystrokes to PTY ─────────────────────────────────────
+
     const onDataDisposable = term.onData((data) => {
       const session = useTerminalStore.getState().sessions.find(s => s.id === sessionId);
       if (session && !session.alive) return;
-      window.electronAPI?.terminalWrite({ id: sessionId, data });
+      writeToPty(data);
     });
 
-    // Resize observer — send new dimensions to PTY
+    // ── Selection auto-copy ───────────────────────────────────────────
+
+    const onSelectionDisposable = term.onSelectionChange(() => {
+      if (term.hasSelection()) {
+        navigator.clipboard.writeText(term.getSelection());
+      }
+    });
+
+    // ── Mouse: right-click paste, middle-click paste, Ctrl+scroll zoom
+
+    const onContextMenu = (e) => {
+      e.preventDefault();
+      pasteFromClipboard();
+    };
+
+    const onMouseDown = (e) => {
+      // Middle-click → paste
+      if (e.button === 1) {
+        e.preventDefault();
+        pasteFromClipboard();
+      }
+    };
+
+    const onWheel = (e) => {
+      // Ctrl+scroll → zoom
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -1 : 1;
+        setFontSize(term.options.fontSize + delta);
+      }
+    };
+
+    const container = containerRef.current;
+    container.addEventListener('contextmenu', onContextMenu);
+    container.addEventListener('mousedown', onMouseDown);
+    container.addEventListener('wheel', onWheel, { passive: false });
+
+    // ── Resize observer ───────────────────────────────────────────────
+
     const resizeObserver = new ResizeObserver(() => {
       try {
         fitAddon.fit();
         window.electronAPI?.terminalResize({ id: sessionId, cols: term.cols, rows: term.rows });
       } catch { /* ignore */ }
     });
-    resizeObserver.observe(containerRef.current);
+    resizeObserver.observe(container);
 
     cleanupRef.current = [cleanupData, cleanupExit];
 
     return () => {
       onDataDisposable.dispose();
+      onSelectionDisposable.dispose();
       resizeObserver.disconnect();
+      container.removeEventListener('contextmenu', onContextMenu);
+      container.removeEventListener('mousedown', onMouseDown);
+      container.removeEventListener('wheel', onWheel);
       cleanupRef.current.forEach((fn) => fn?.());
       window.electronAPI?.terminalKill({ id: sessionId });
       term.dispose();

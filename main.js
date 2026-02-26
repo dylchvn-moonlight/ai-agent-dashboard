@@ -897,6 +897,80 @@ ipcMain.handle('assistant:chat', async (_event, { message, history, knowledgeCon
   }
 });
 
+// --- n8n API Proxy IPC Handlers ---
+
+ipcMain.handle('n8n:request', async (_event, method, path, body) => {
+  try {
+    const credentials = loadAllCredentials();
+    const baseUrl = credentials['n8n-api-url'];
+    const apiKey = credentials['n8n-api-key'];
+
+    if (!baseUrl || !apiKey) {
+      return { success: false, error: 'n8n API URL or API key not configured. Go to Settings > n8n Integration.' };
+    }
+
+    const url = `${baseUrl.replace(/\/+$/, '')}/api/v1${path}`;
+    const options = {
+      method,
+      headers: {
+        'X-N8N-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+    };
+
+    if (body && (method === 'POST' || method === 'PATCH' || method === 'PUT')) {
+      options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(url, options);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, error: `n8n API error (${response.status}): ${errorText}` };
+    }
+
+    // DELETE may return empty body
+    if (response.status === 204 || response.headers.get('content-length') === '0') {
+      return { success: true, data: null };
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
+ipcMain.handle('n8n:test-connection', async () => {
+  try {
+    const credentials = loadAllCredentials();
+    const baseUrl = credentials['n8n-api-url'];
+    const apiKey = credentials['n8n-api-key'];
+
+    if (!baseUrl || !apiKey) {
+      return { success: false, error: 'n8n API URL or API key not configured.' };
+    }
+
+    const url = `${baseUrl.replace(/\/+$/, '')}/api/v1/workflows?limit=1`;
+    const response = await fetch(url, {
+      method: 'GET',
+      headers: {
+        'X-N8N-API-KEY': apiKey,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return { success: false, error: `Connection failed (${response.status}): ${errorText}` };
+    }
+
+    return { success: true };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+});
+
 // --- Widget Export ---
 
 const { dialog } = require('electron');

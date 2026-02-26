@@ -5,11 +5,10 @@
  * and exposes stdin/stdout/stderr through a simple API that the IPC layer calls.
  *
  * Uses child_process.spawn (no native deps) instead of node-pty.
- * Limitation: no PTY means no interactive programs (vim, htop) or tab completion.
+ * Without a PTY, the renderer implements its own line buffer + local echo.
  */
 
 const { spawn } = require('child_process');
-const path = require('path');
 const os = require('os');
 
 class TerminalManager {
@@ -20,6 +19,7 @@ class TerminalManager {
 
   /**
    * Detect the default shell for the current platform.
+   * Prefers PowerShell on Windows for better output, cmd.exe as fallback.
    */
   getDefaultShell() {
     if (process.platform === 'win32') {
@@ -41,7 +41,7 @@ class TerminalManager {
    * @param {object} opts
    * @param {string} [opts.shell] — shell executable override
    * @param {string} [opts.cwd] — working directory override
-   * @returns {{ success: boolean, error?: string }}
+   * @returns {{ success: boolean, error?: string, shell?: string }}
    */
   spawn(id, { shell, cwd } = {}) {
     if (this.sessions.has(id)) {
@@ -51,13 +51,16 @@ class TerminalManager {
     const shellCmd = shell || this.getDefaultShell();
     const workDir = cwd || this.getDefaultCwd();
 
-    // Shell-specific args for interactive-ish behavior
+    // Shell-specific args
     const args = [];
-    if (shellCmd.includes('powershell')) {
-      args.push('-NoLogo', '-NoExit');
-    } else if (shellCmd.includes('bash') || shellCmd.includes('zsh')) {
-      args.push('--login');
+    if (shellCmd.includes('powershell') || shellCmd.includes('pwsh')) {
+      // -NoLogo: suppress banner, -NoProfile: faster startup, -NonInteractive not used
+      // because we still want to send commands via stdin
+      args.push('-NoLogo', '-NoExit', '-Command', '-');
+    } else if (shellCmd.includes('cmd')) {
+      args.push('/Q'); // echo off — we handle echo in renderer
     }
+    // bash/zsh: no special args needed for piped stdin
 
     try {
       const proc = spawn(shellCmd, args, {
@@ -67,15 +70,21 @@ class TerminalManager {
         windowsHide: true,
       });
 
+      // Handle spawn errors (e.g. shell not found)
+      proc.on('error', (err) => {
+        console.error(`Terminal ${id} spawn error:`, err.message);
+      });
+
       this.sessions.set(id, proc);
-      return { success: true, pid: proc.pid };
+      return { success: true, pid: proc.pid, shell: shellCmd };
     } catch (e) {
       return { success: false, error: e.message };
     }
   }
 
   /**
-   * Write data (keystrokes) to a session's stdin.
+   * Write data to a session's stdin.
+   * The renderer sends complete lines (already has \n appended).
    */
   write(id, data) {
     const proc = this.sessions.get(id);
@@ -92,8 +101,6 @@ class TerminalManager {
    * Resize — no-op for child_process (no PTY). Placeholder for future node-pty upgrade.
    */
   resize(id, cols, rows) {
-    // child_process doesn't support resize; this is a no-op.
-    // When upgrading to node-pty, call proc.resize(cols, rows) here.
     return true;
   }
 
